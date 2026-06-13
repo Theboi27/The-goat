@@ -410,6 +410,17 @@ for (const [id, [style, stance]] of Object.entries(CHAR_STYLE)) {
 // feminine proportions
 for (const id of ['prisia', 'tsunami', 'glacier']) CHARACTERS[id].visual.fem = true;
 
+// fighting-style display names (shown on the fight HUD, MK-style)
+const STYLE_NAMES = {
+  julias: 'HYPER-FLOW', shadow: 'GHOST ARTS', prisia: 'LUMINANT ARTS',
+  tecton: 'GAIA BREAKER', lucio: 'LEGION FORM', breeze: 'TEMPEST RUSH',
+  conrad: 'UNBOUND BOXING', reap: 'DREAM LOGIC', tsunami: 'TIDAL FORM',
+  kaito: 'VACUUM STYLE', glacier: 'GLACIAL BASTION', gungod: 'ORDNANCE CQC',
+  outsider: 'CYBER NINJUTSU', kenzo: 'IAIDO', dreamman: 'THE CORRECTION',
+  cosmio: 'COSMIOSTASIS', dreamfix: 'LUCID FORM',
+};
+for (const [id, name] of Object.entries(STYLE_NAMES)) CHARACTERS[id].styleName = name;
+
 function rosterIds() {
   const unlocked = localStorage.getItem('skcr_unlocked') === '1';
   return unlocked ? ROSTER.concat(SECRET_ROSTER) : ROSTER.slice();

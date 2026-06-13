@@ -16,9 +16,9 @@
 // ============================================================
 const Humanoid = (() => {
 
-  // body segment lengths at scale 1
-  const B = { torso: 34, neck: 5, headR: 8.5, uArm: 16, fArm: 15, hand: 4.2,
-              thigh: 25, shin: 24, foot: 9, shoulderW: 11, hipW: 6.5 };
+  // body segment lengths at scale 1 (heroic ~7.5-head proportions)
+  const B = { torso: 34, neck: 5, headR: 8.1, uArm: 16, fArm: 15, hand: 4.2,
+              thigh: 25, shin: 24, foot: 9, shoulderW: 11.8, hipW: 6.5 };
 
   // ---------------- POSE LIBRARY ----------------
   const P = {};
@@ -305,6 +305,44 @@ const Humanoid = (() => {
       ctx.beginPath();
       ctx.moveTo(a[0] + nx * w1 * 0.2 + (b[0] - a[0]) * 0.18, a[1] + ny * w1 * 0.2 + (b[1] - a[1]) * 0.18);
       ctx.lineTo(a[0] + nx * w2 * 0.2 + (b[0] - a[0]) * 0.8, a[1] + ny * w2 * 0.2 + (b[1] - a[1]) * 0.8);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // limb with a real muscle belly: bicep/quad/calf bulge swelling at
+  // `at` along the bone, easing into the joints — reads as anatomy
+  function muscle(ctx, a, b, w1, wB, w2, at, col, hi = 0.12) {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const ang = Math.atan2(dy, dx);
+    const m = [a[0] + dx * at, a[1] + dy * at];
+    const d1 = ang - Math.PI / 2, d2 = ang + Math.PI / 2;
+    const off = (p, d, w) => [p[0] + Math.cos(d) * w / 2, p[1] + Math.sin(d) * w / 2];
+    const g = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+    g.addColorStop(0, shade(col, 12));
+    g.addColorStop(1, shade(col, -10));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(a[0], a[1], w1 / 2, d2, d1);
+    const s1 = off(b, d1, w2), c1 = off(m, d1, wB);
+    ctx.quadraticCurveTo(c1[0], c1[1], s1[0], s1[1]);
+    ctx.arc(b[0], b[1], w2 / 2, d1, d2);
+    const s0 = off(a, d2, w1), c2 = off(m, d2, wB);
+    ctx.quadraticCurveTo(c2[0], c2[1], s0[0], s0[1]);
+    ctx.closePath();
+    ctx.fill();
+    if (hi > 0) {
+      ctx.save();
+      ctx.globalAlpha = hi;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.min(w1, w2) * 0.3;
+      ctx.lineCap = 'round';
+      const h0 = off([a[0] + dx * 0.2, a[1] + dy * 0.2], d1, w1 * 0.45);
+      const h1 = off([a[0] + dx * 0.78, a[1] + dy * 0.78], d1, w2 * 0.45);
+      const hc = off(m, d1, wB * 0.55);
+      ctx.beginPath();
+      ctx.moveTo(h0[0], h0[1]);
+      ctx.quadraticCurveTo(hc[0], hc[1], h1[0], h1[1]);
       ctx.stroke();
       ctx.restore();
     }
@@ -732,16 +770,21 @@ const Humanoid = (() => {
       ctx.shadowBlur = 12 + Math.sin(t * 6) * 4;
     }
 
+    // muscle-belly emphasis scales with build, softer on feminine frames
+    const mus = 1 + (v.build || 0.3) * 0.32 - (fem ? 0.2 : 0);
+    const biW = wArmU * 1.28 * mus, caW = wKnee * 1.3 * mus;
+    const quW = wThigh * 1.12 * mus, frW = wElbow * 1.14 * mus;
+
     // ---- far limbs (darker for depth) ----
     const dk = -42;
-    taper(ctx, s.hip, s.knR, wThigh, wKnee, shade(suit.legs, dk), 0);
+    muscle(ctx, s.hip, s.knR, wThigh, quW, wKnee, 0.35, shade(suit.legs, dk), 0);
     joint(ctx, s.knR, wKnee, shade(suit.legs, dk));
-    taper(ctx, s.knR, s.ftR, wKnee, wAnkle, shade(suit.legs, dk), 0);
+    muscle(ctx, s.knR, s.ftR, wKnee, caW, wAnkle, 0.3, shade(suit.legs, dk), 0);
     drawBoot(ctx, s.ftR, s.ftRA, shade(suit.boots, dk));
     joint(ctx, s.shoulderR, wArmU * 1.05, shade(suit.arms, dk)); // far deltoid
-    taper(ctx, s.shoulderR, s.elR, wArmU, wElbow, shade(suit.arms, dk), 0);
+    muscle(ctx, s.shoulderR, s.elR, wArmU, biW, wElbow, 0.42, shade(suit.arms, dk), 0);
     joint(ctx, s.elR, wElbow, shade(suit.arms, dk));
-    taper(ctx, s.elR, s.handR, wElbow, wArmW, shade(suit.arms, dk), 0);
+    muscle(ctx, s.elR, s.handR, wElbow, frW, wArmW, 0.3, shade(suit.arms, dk), 0);
     drawFist(ctx, s.handR, s.handRA, v.gloves ? shade(suit.gloves, dk) : shade(v.skin, dk));
     if (v.weapon) drawWeapon(ctx, ch, s, t);
 
@@ -862,21 +905,21 @@ const Humanoid = (() => {
       ? suit.torso : v.skin;
     taper(ctx, [s.neck[0], s.neck[1] + 1.5], s.headC, 5.2 * bw * lw, 4.2 * bw * lw, neckCol, 0);
 
-    // ---- near leg ----
-    taper(ctx, s.hip, s.knL, wThigh, wKnee, suit.legs);
+    // ---- near leg (quad + calf bellies) ----
+    muscle(ctx, s.hip, s.knL, wThigh, quW, wKnee, 0.35, suit.legs);
     joint(ctx, s.knL, wKnee, suit.legs);
-    taper(ctx, s.knL, s.ftL, wKnee, wAnkle, shade(suit.legs, 4));
+    muscle(ctx, s.knL, s.ftL, wKnee, caW, wAnkle, 0.3, shade(suit.legs, 4));
     drawBoot(ctx, s.ftL, s.ftLA, suit.boots);
 
     // ---- head ----
     drawHead(ctx, ch, s, t);
     if (v.railgun) drawRailgun(ctx, s);
 
-    // ---- near arm (deltoid + tapered segments + fist) ----
+    // ---- near arm (deltoid + bicep/forearm bellies + fist) ----
     joint(ctx, s.shoulderL, wArmU * 1.12, shade(suit.arms, 14));
-    taper(ctx, s.shoulderL, s.elL, wArmU, wElbow, suit.arms);
+    muscle(ctx, s.shoulderL, s.elL, wArmU, biW, wElbow, 0.42, suit.arms);
     joint(ctx, s.elL, wElbow, suit.arms);
-    taper(ctx, s.elL, s.handL, wElbow, wArmW, shade(suit.arms, 5));
+    muscle(ctx, s.elL, s.handL, wElbow, frW, wArmW, 0.3, shade(suit.arms, 5));
     drawFist(ctx, s.handL, s.handLA, v.gloves ? suit.gloves : v.skin);
 
     // impact-frame additive glow

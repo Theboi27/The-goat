@@ -24,14 +24,15 @@ npx http-server .
 
 ## The Hyper-Flow Combat System
 
-- **Link System** — light attacks cancel into anything on hit for lag-free combo strings, with damage scaling and an on-screen combo counter.
+- **Link System** — chain-combo routes (LP → LK → HP → HK, plus launcher and special/finisher cancels) with air juggles, damage scaling, an on-screen combo counter and end-of-string damage summary.
 - **Impact frames** — every clean hit freezes both fighters for a few frames with a radial spark burst, white flash and screen shake. Heavy hits hit *hard*.
 - **Perfect Counter** — tap Block right before a hit lands: slow-mo flash, attacker staggered, meter bonus.
 - **Hyper-Dash** — teleporting dash with afterimages, limited by the Stamina meter to prevent spamming.
 - **Omnidirectional Flight** — fliers (Static Knight, Kaito, Breeze Master, Prisia, Tsunami, Dream Man…) press jump again mid-air to fly freely.
 - **Finishers** — fill the super meter and unleash a cinematic named finisher (Cosmoversal Strike, Mumbai Requiem, Population Multiplier, 16-ton Dream Logic…). Some apply Static State slow, Absolute Zero freeze, or Dream Man's Relativity control-reversal.
 - Per-character **entrance animations** (smoke bomb, fly-in, teleport, seismic crash, water/ice burst, walk-up) and **pre-fight dialogue** with matchup-specific lines.
-- Character select with **dual P1/CPU-P2 displays**, per-character confirm animations and signature sound.
+- Tournament-style character select: title banner, two large fighter busts over engraved nameplates, a full-width portrait-tile grid with a **Random** tile, per-character confirm animations and signature sound.
+- Tournament HUD: skewed health bars with a draining damage trail, ornate timer medallion, round-win gems, and each fighter's **style name** (IAIDO, UNBOUND BOXING, DREAM LOGIC…) displayed at the bottom.
 
 ## Roster (15 + 2 secret)
 

@@ -206,7 +206,7 @@ const STAGES = (() => {
     } };
 
   // ---- SITE OMEGA ----
-  S.omega = { name: 'SITE OMEGA', floorY: FLOOR, music: 'fight',
+  S.omega = { name: 'SITE OMEGA', floorY: FLOOR, music: 'fight', reflect: true,
     draw(ctx, t, W, H, camX) {
       ctx.fillStyle = '#0b1016'; ctx.fillRect(0, 0, W, H);
       // wall panels
@@ -362,7 +362,7 @@ const STAGES = (() => {
     } };
 
   // ---- THRONE OF GLASS ----
-  S.throne = { name: 'THRONE OF GLASS', floorY: FLOOR, music: 'boss',
+  S.throne = { name: 'THRONE OF GLASS', floorY: FLOOR, music: 'boss', reflect: true,
     draw(ctx, t, W, H, camX) {
       const g = ctx.createLinearGradient(0, 0, 0, H);
       g.addColorStop(0, '#070310'); g.addColorStop(0.7, '#1c1030'); g.addColorStop(1, '#0d0618');
@@ -413,7 +413,7 @@ const STAGES = (() => {
     } };
 
   // ---- CYBER CITY ROOFTOP (secret stage) ----
-  S.rooftop = { name: 'CYBER CITY ROOFTOP', floorY: FLOOR, music: 'fight', secret: true,
+  S.rooftop = { name: 'CYBER CITY ROOFTOP', floorY: FLOOR, music: 'fight', secret: true, reflect: true,
     draw(ctx, t, W, H, camX) {
       cityScape(ctx, t, W, H, camX, {
         skyTop: '#04060f', skyBot: '#101a33', far: '#101626', near: '#161e33',

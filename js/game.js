@@ -168,16 +168,46 @@ function drawControls(dt) {
 // ============================================================
 // CHARACTER SELECT — dual displays, per-character confirm FX
 // ============================================================
-const SEL = { roster: [], p1: 0, p2: 1, l1: false, l2: false,
-  fx1: 0, fx2: 0, phase: 'pick', stageIdx: 0, cols: 8 };
+const SEL = { cells: [], p1: 0, p2: 1, l1: false, l2: false, c1: null, c2: null,
+  fx1: 0, fx2: 0, stageIdx: 0, cols: 8 };
 
 function startSelect() {
-  SEL.roster = rosterIds();
-  SEL.p1 = 0; SEL.p2 = Math.min(1, SEL.roster.length - 1);
-  SEL.l1 = false; SEL.l2 = false; SEL.fx1 = 0; SEL.fx2 = 0;
-  SEL.phase = 'pick'; SEL.stageIdx = 0;
+  const ids = rosterIds();
+  const cells = ids.slice();
+  cells.splice(Math.ceil(cells.length / 2), 0, 'rand'); // random tile mid-grid
+  SEL.cells = cells;
+  SEL.cols = Math.ceil(cells.length / 2);
+  SEL.p1 = 0; SEL.p2 = Math.min(1, cells.length - 1);
+  SEL.l1 = false; SEL.l2 = false; SEL.c1 = null; SEL.c2 = null;
+  SEL.fx1 = 0; SEL.fx2 = 0; SEL.stageIdx = 0;
   G.scene = 'select';
   AudioSys.music('menu');
+}
+
+function resolveCell(i) {
+  const c = SEL.cells[i];
+  if (c !== 'rand') return c;
+  const ids = SEL.cells.filter(x => x !== 'rand');
+  return ids[Math.floor(Math.random() * ids.length)];
+}
+
+// head-and-shoulders portrait for the grid tiles
+const facePortraits = {};
+function portraitFace(id) {
+  if (facePortraits[id]) return facePortraits[id];
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const pc = c.getContext('2d');
+  const ch = CHARACTERS[id];
+  const g = pc.createLinearGradient(0, 0, 0, 64);
+  g.addColorStop(0, '#1c2333'); g.addColorStop(1, '#0c111c');
+  pc.fillStyle = g; pc.fillRect(0, 0, 64, 64);
+  const hs = ch.visual.heightScale || 1;
+  // place ground so the head always sits near the top of the tile
+  Humanoid.draw(pc, ch, Humanoid.pose(ch.stance || 'idle'),
+    { x: 30, y: 18 + 223 * hs, facing: 1, scale: 2.3, t: 0.6, shadow: false });
+  facePortraits[id] = c;
+  return c;
 }
 
 function selectFxDraw(id, x, y, k) {
@@ -225,101 +255,188 @@ function selectFxDraw(id, x, y, k) {
   ctx.restore();
 }
 
-function drawSelectPanel(side, id, locked, fxT) {
-  const x = side === 0 ? 200 : W - 200;
-  const baseY = 470;
-  const ch = CHARACTERS[id];
-  // panel backdrop
-  const g = ctx.createLinearGradient(x - 170, 80, x + 170, 520);
-  g.addColorStop(0, 'rgba(20,30,50,0.85)');
-  g.addColorStop(1, `rgba(${side === 0 ? '30,70,110' : '110,45,45'},0.5)`);
-  ctx.fillStyle = g;
-  roundRect(x - 175, 70, 350, 460, 14, null, null);
+// big tournament bust, MK-style: large fighter over an engraved nameplate
+function drawBust(side, cell, locked, fxT, lockedId) {
+  const x = side === 0 ? 240 : W - 240;
+  const baseY = 545;
+  const id = locked ? lockedId : (cell === 'rand' ? null : cell);
+  const ch = id ? CHARACTERS[id] : null;
+  const themeCol = ch ? ch.theme : '#caa84f';
+
+  // arched alcove backdrop with character-colored inner glow
+  ctx.save();
+  const ag = ctx.createLinearGradient(x, 110, x, 560);
+  ag.addColorStop(0, 'rgba(14,18,30,0.92)');
+  ag.addColorStop(1, side === 0 ? 'rgba(28,58,92,0.45)' : 'rgba(92,40,38,0.45)');
+  ctx.fillStyle = ag;
+  ctx.beginPath();
+  ctx.moveTo(x - 195, 560);
+  ctx.lineTo(x - 195, 220);
+  ctx.arc(x, 220, 195, Math.PI, 0);
+  ctx.lineTo(x + 195, 560);
+  ctx.closePath();
   ctx.fill();
-  roundRect(x - 175, 70, 350, 460, 14, null, locked ? ch.theme : 'rgba(130,160,200,0.4)', locked ? 3 : 2);
-  drawText(side === 0 ? 'P1' : (G.mode === 'vs2p' ? 'P2' : 'CPU'), x + (side === 0 ? -148 : 148), 105, 24,
-    side === 0 ? '#7fd4ff' : '#ff9b8a');
-
-  // animated character display
-  const t = G.t + side * 3;
-  let pose;
-  if (locked && fxT < 0.8) {
-    // each character strikes their own pose on confirm
-    const pk = Math.min(1, fxT * 2.2);
-    const poseName = { lightning: 'cast', smoke: 'crouch', water: 'cast', ice: 'block',
-      light: 'win', silver: 'sword_w', rock: 'slam_w', wind: 'fly', void: 'win2',
-      rage: 'charge', gun: 'jab_x', slash: 'sword_x' }[ch.selectFx] || 'win';
-    pose = Humanoid.lerp(Humanoid.pose('idle'), Humanoid.pose(poseName), pk);
-  } else if (locked) {
-    pose = Humanoid.pose(ch.selectFx === 'smoke' ? 'crouch' : 'win');
-  } else {
-    // show the character's signature fighting stance, breathing
-    const p = { ...Humanoid.pose(ch.stance || 'idle') };
-    p.hipY += Math.sin(t * 2.4) * 1.5;
-    p.head += Math.sin(t * 1.6) * 0.03;
-    pose = p;
+  if (ch) {
+    const ig = ctx.createRadialGradient(x, 330, 30, x, 330, 230);
+    ig.addColorStop(0, themeCol + '33');
+    ig.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = ig;
+    ctx.fillRect(x - 195, 110, 390, 450);
   }
-  Humanoid.draw(ctx, ch, pose, { x, y: baseY, facing: side === 0 ? 1 : -1,
-    scale: 2.3, t, shadow: true, aura: locked ? ch.theme : null });
-  if (locked && fxT < 1) selectFxDraw(id, x, baseY, fxT);
+  ctx.strokeStyle = locked ? themeCol : 'rgba(120,140,175,0.45)';
+  ctx.lineWidth = locked ? 3.5 : 2;
+  ctx.stroke();
+  // clip the figure to the alcove so big busts stay framed
+  ctx.clip();
 
-  // nameplate
-  roundRect(x - 165, 535, 330, 64, 8, 'rgba(8,12,22,0.85)', ch.theme, 2);
-  drawText(ch.name, x, 562, 24, locked ? ch.theme : '#dfe9f5');
-  drawText(ch.title, x, 588, 13, '#8fa6c0', 'center', 'Segoe UI, sans-serif', false);
+  drawText(side === 0 ? 'P1' : (G.mode === 'vs2p' ? 'P2' : 'CPU'),
+    x + (side === 0 ? -160 : 160), 150, 26, side === 0 ? '#7fd4ff' : '#ff9b8a');
+
+  const t = G.t + side * 3;
+  if (!ch) {
+    // random tile hovered — mystery silhouette
+    ctx.shadowColor = '#caa84f'; ctx.shadowBlur = 24;
+    drawText('?', x, 400, 180, '#2c3142');
+    ctx.shadowBlur = 0;
+  } else {
+    let pose;
+    if (locked && fxT < 0.8) {
+      const pk = Math.min(1, fxT * 2.2);
+      const poseName = { lightning: 'cast', smoke: 'crouch', water: 'cast', ice: 'block',
+        light: 'win', silver: 'sword_w', rock: 'slam_w', wind: 'fly', void: 'win2',
+        rage: 'charge', gun: 'jab_x', slash: 'sword_x' }[ch.selectFx] || 'win';
+      pose = Humanoid.lerp(Humanoid.pose(ch.stance || 'idle'), Humanoid.pose(poseName), pk);
+    } else if (locked) {
+      pose = Humanoid.pose(ch.selectFx === 'smoke' ? 'crouch' : 'win');
+    } else {
+      const p = { ...Humanoid.pose(ch.stance || 'idle') };
+      p.hipY += Math.sin(t * 2.4) * 1.5;
+      p.head += Math.sin(t * 1.6) * 0.03;
+      pose = p;
+    }
+    // large bust: head-to-knees framing
+    Humanoid.draw(ctx, ch, pose, { x, y: baseY + 130, facing: side === 0 ? 1 : -1,
+      scale: 3.6, t, shadow: false, aura: locked ? ch.theme : null });
+    if (locked && fxT < 1) selectFxDraw(id, x, baseY + 130, fxT);
+  }
+  ctx.restore();
+
+  // engraved nameplate (skewed metal bar)
+  const name = ch ? ch.name : 'RANDOM SELECT';
+  const sub = ch ? ch.title : 'Fate picks your champion';
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x - 188, 566); ctx.lineTo(x + 188, 566);
+  ctx.lineTo(x + 174, 612); ctx.lineTo(x - 174, 612);
+  ctx.closePath();
+  const ng = ctx.createLinearGradient(x, 566, x, 612);
+  ng.addColorStop(0, '#2a3142'); ng.addColorStop(0.5, '#10141f'); ng.addColorStop(1, '#1c2230');
+  ctx.fillStyle = ng; ctx.fill();
+  ctx.strokeStyle = locked ? themeCol : '#46506a'; ctx.lineWidth = 2; ctx.stroke();
+  drawText(name, x, 594, 23, locked ? themeCol : '#e6edf8');
+  ctx.restore();
+  drawText(sub, x, 632, 13, '#8fa6c0', 'center', 'Segoe UI, sans-serif', false);
 }
 
 function drawSelect(dt) {
-  ctx.fillStyle = '#060912'; ctx.fillRect(0, 0, W, H);
-  // animated backdrop
-  STAGES.cityScape(ctx, G.t * 0.6, W, H, 200, {
-    skyTop: '#04060f', skyBot: '#0b1326', far: '#0a0f1c', near: '#0e1526',
-    win: '#3d4a66', neon: ['#1d3a55'] });
-  ctx.fillStyle = 'rgba(4,7,15,0.78)'; ctx.fillRect(0, 0, W, H);
+  // gritty tournament backdrop: dark stone, drifting smoke, embers
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#11141d'); bg.addColorStop(0.5, '#1a1d27'); bg.addColorStop(1, '#0a0c12');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(120,130,150,0.05)';
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.ellipse((i * 330 + G.t * 18) % (W + 300) - 150, 140 + i * 90, 220, 50, 0, 0, 6.29);
+    ctx.fill();
+  }
+  STAGES.embersFx(ctx, G.t * 0.5, W, H, 'rgba(180,150,90,0.5)');
 
-  drawText('CHOOSE YOUR FIGHTER', W / 2, 52, 38, '#eaf8ff');
+  // ---- title banner with emblem (MK-style header) ----
+  const bnG = ctx.createLinearGradient(0, 14, 0, 92);
+  bnG.addColorStop(0, '#2c3344'); bnG.addColorStop(0.5, '#12161f'); bnG.addColorStop(1, '#232a3a');
+  roundRect(W / 2 - 350, 14, 700, 78, 10, null, null);
+  ctx.fillStyle = bnG; ctx.fill();
+  roundRect(W / 2 - 350, 14, 700, 78, 10, null, '#4d5a75', 2.5);
+  roundRect(W / 2 - 344, 20, 688, 66, 8, null, 'rgba(160,180,220,0.18)', 1);
+  ctx.save();
+  const mg = ctx.createLinearGradient(0, 30, 0, 80);
+  mg.addColorStop(0, '#f2f7ff'); mg.addColorStop(0.55, '#9fb3cf'); mg.addColorStop(1, '#5d7090');
+  ctx.font = "900 44px Impact, 'Arial Black', sans-serif";
+  ctx.textAlign = 'right'; ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  ctx.strokeText('STATIC', W / 2 - 58, 70); ctx.fillStyle = mg; ctx.fillText('STATIC', W / 2 - 58, 70);
+  ctx.textAlign = 'left';
+  ctx.strokeText('KNIGHT', W / 2 + 58, 70); ctx.fillText('KNIGHT', W / 2 + 58, 70);
+  // shield-and-bolt emblem between the words
+  ctx.translate(W / 2, 52);
+  ctx.shadowColor = '#9fe7ff'; ctx.shadowBlur = 12;
+  ctx.strokeStyle = '#9fe7ff'; ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(-17, -19); ctx.lineTo(17, -19); ctx.lineTo(15, 9);
+  ctx.quadraticCurveTo(0, 25, -15, 9); ctx.closePath(); ctx.stroke();
+  ctx.fillStyle = '#cfeeff';
+  ctx.beginPath();
+  ctx.moveTo(4, -14); ctx.lineTo(-7, 1); ctx.lineTo(-0.5, 2);
+  ctx.lineTo(-4, 16); ctx.lineTo(8, -1); ctx.lineTo(1.5, -2);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
 
   if (SEL.l1) SEL.fx1 += dt; if (SEL.l2) SEL.fx2 += dt;
-  drawSelectPanel(0, SEL.roster[SEL.p1], SEL.l1, SEL.fx1);
-  drawSelectPanel(1, SEL.roster[SEL.p2], SEL.l2, SEL.fx2);
+  drawBust(0, SEL.cells[SEL.p1], SEL.l1, SEL.fx1, SEL.c1);
+  drawBust(1, SEL.cells[SEL.p2], SEL.l2, SEL.fx2, SEL.c2);
 
   // VS emblem
   ctx.save();
-  ctx.shadowColor = '#ff9b3d'; ctx.shadowBlur = 18;
-  drawText('VS', W / 2, 330, 64, '#ffce8a');
+  ctx.shadowColor = '#ff9b3d'; ctx.shadowBlur = 18 + Math.sin(G.t * 4) * 6;
+  drawText('VS', W / 2, 370, 70, '#ffce8a');
   ctx.restore();
 
-  // roster grid
-  const ids = SEL.roster;
-  const cols = SEL.cols, cw = 78, chh = 96;
-  const gx = W / 2 - (cols * cw) / 2, gy = 615 - chh / 2 - 24;
-  for (let i = 0; i < ids.length; i++) {
-    const cx = gx + (i % cols) * cw, cy = gy + Math.floor(i / cols) * (chh * 0.56);
-    const ch = CHARACTERS[ids[i]];
+  // ---- full-width roster tile grid ----
+  const cells = SEL.cells;
+  const cols = SEL.cols, ts = 58, gap = 6;
+  const gx = W / 2 - (cols * (ts + gap)) / 2, gy = 596;
+  for (let i = 0; i < cells.length; i++) {
+    const cx = gx + (i % cols) * (ts + gap), cy = gy + Math.floor(i / cols) * (ts + gap);
+    const cell = cells[i];
     const hov1 = i === SEL.p1 && !SEL.l1, hov2 = i === SEL.p2 && !SEL.l2;
     const lock1 = i === SEL.p1 && SEL.l1, lock2 = i === SEL.p2 && SEL.l2;
-    roundRect(cx + 2, cy, cw - 6, chh * 0.52, 6,
-      ch.secret ? 'rgba(80,60,10,0.8)' : 'rgba(16,24,40,0.9)',
-      lock1 || lock2 ? ch.theme : hov1 ? '#7fd4ff' : hov2 ? '#ff9b8a' : 'rgba(80,100,135,0.5)',
-      hov1 || hov2 || lock1 || lock2 ? 3 : 1.5);
-    ctx.save();
-    ctx.beginPath(); ctx.roundRect(cx + 2, cy, cw - 6, chh * 0.52, 6); ctx.clip();
-    ctx.drawImage(portrait(ids[i]), cx - 8, cy - 6, 90, 122);
-    ctx.restore();
-    if (hov1 || lock1) drawText('1', cx + 12, cy + 16, 16, '#7fd4ff');
-    if (hov2 || lock2) drawText('2', cx + cw - 18, cy + 16, 16, '#ff9b8a');
+    if (cell === 'rand') {
+      roundRect(cx, cy, ts, ts, 5, '#1a1408', '#8a7434', 2);
+      drawText('?', cx + ts / 2, cy + ts / 2 + 13, 36, '#caa84f');
+    } else {
+      const ch = CHARACTERS[cell];
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(cx, cy, ts, ts, 5); ctx.clip();
+      ctx.drawImage(portraitFace(cell), cx, cy, ts, ts);
+      if (ch.secret) {
+        ctx.fillStyle = 'rgba(160,130,40,0.18)'; ctx.fillRect(cx, cy, ts, ts);
+      }
+      ctx.restore();
+      roundRect(cx, cy, ts, ts, 5, null,
+        ch.secret ? '#8a7434' : '#3a4150', 1.6);
+    }
+    // selection cursors
+    if (hov1 || lock1 || hov2 || lock2) {
+      ctx.save();
+      const col = (hov1 || lock1) && (hov2 || lock2) ? '#e8d8ff'
+        : (hov1 || lock1) ? '#46c8ff' : '#ff7a4d';
+      ctx.shadowColor = col; ctx.shadowBlur = (lock1 || lock2) ? 14 : 8;
+      roundRect(cx - 2, cy - 2, ts + 4, ts + 4, 6, null, col, 3);
+      ctx.restore();
+      if (hov1 || lock1) drawText('1', cx + 9, cy + 16, 15, '#9fe2ff');
+      if (hov2 || lock2) drawText('2', cx + ts - 9, cy + 16, 15, '#ffb09a');
+    }
   }
-  const hovered = CHARACTERS[ids[SEL.l1 ? SEL.p2 : SEL.p1]];
-  drawText(`${hovered.name} — "${hovered.alias}"`, W / 2, 700, 16, '#8fa6c0', 'center', 'Segoe UI, sans-serif', false);
 
   FX.update(dt); FX.draw(ctx);
+  // vignette
+  const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.42, W / 2, H / 2, H * 0.95);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
 
-  // input
+  // ---- input ----
   const moveP = (who, d) => {
     const cur = who === 1 ? SEL.p1 : SEL.p2;
-    let nxt = cur + d;
-    if (d === -cols || d === cols) nxt = cur + d;
-    nxt = (nxt + ids.length) % ids.length;
+    const nxt = (cur + d + cells.length) % cells.length;
     if (who === 1) SEL.p1 = nxt; else SEL.p2 = nxt;
     AudioSys.sfx('move');
   };
@@ -328,7 +445,11 @@ function drawSelect(dt) {
     if (Input.key('KeyD')) moveP(1, 1);
     if (Input.key('KeyW')) moveP(1, -cols);
     if (Input.key('KeyS')) moveP(1, cols);
-    if (Input.key('KeyJ')) { SEL.l1 = true; SEL.fx1 = 0; AudioSys.sfx('confirm'); AudioSys.sfx(pickSfx(ids[SEL.p1])); }
+    if (Input.key('KeyJ')) {
+      SEL.c1 = resolveCell(SEL.p1);
+      SEL.l1 = true; SEL.fx1 = 0;
+      AudioSys.sfx('confirm'); AudioSys.sfx(pickSfx(SEL.c1));
+    }
   }
   const p2human = G.mode === 'vs2p';
   if (!SEL.l2 && p2human) {
@@ -337,18 +458,24 @@ function drawSelect(dt) {
     if (Input.key('ArrowUp')) moveP(2, -cols);
     if (Input.key('ArrowDown')) moveP(2, cols);
     if (Input.key('Numpad1') || Input.key('KeyB') || Input.key('Enter')) {
-      SEL.l2 = true; SEL.fx2 = 0; AudioSys.sfx('confirm'); AudioSys.sfx(pickSfx(ids[SEL.p2]));
+      SEL.c2 = resolveCell(SEL.p2);
+      SEL.l2 = true; SEL.fx2 = 0;
+      AudioSys.sfx('confirm'); AudioSys.sfx(pickSfx(SEL.c2));
     }
   } else if (!SEL.l2 && !p2human && SEL.l1 && SEL.fx1 > 0.5) {
-    // CPU roulette pick
-    SEL.p2 = (SEL.p2 + 1) % ids.length;
-    if (SEL.fx1 > 1.4) { SEL.l2 = true; SEL.fx2 = 0; AudioSys.sfx('confirm'); }
+    // CPU roulette pick sweeping the grid
+    SEL.p2 = (SEL.p2 + 1) % cells.length;
+    if (SEL.fx1 > 1.4) {
+      SEL.c2 = resolveCell(SEL.p2);
+      SEL.l2 = true; SEL.fx2 = 0;
+      AudioSys.sfx('confirm');
+    }
   }
   if (Input.key('Escape')) { AudioSys.sfx('back'); G.scene = 'menu'; }
 
   if (SEL.l1 && SEL.l2 && Math.min(SEL.fx1, SEL.fx2) > 1.1) {
     if (G.mode === 'arcade') {
-      startArcade(ids[SEL.p1]);
+      startArcade(SEL.c1);
     } else {
       G.scene = 'stageselect';
       SEL.stageList = STAGES.list();
@@ -386,7 +513,7 @@ function drawStageSelect(dt) {
   if (Input.key('Escape')) { AudioSys.sfx('back'); startSelect(); }
   if (Input.key('KeyJ') || Input.key('Enter') || Input.key('Numpad1')) {
     AudioSys.sfx('confirm');
-    startFight({ p1: SEL.roster[SEL.p1], p2: SEL.roster[SEL.p2], stage: id,
+    startFight({ p1: SEL.c1, p2: SEL.c2, stage: id,
       cpu2: G.mode !== 'vs2p', rounds: 2 });
   }
 }
@@ -473,7 +600,7 @@ F.resolveHit = (att, def, m, hx, hy) => {
   FX.shake(2.5 + power * 4);
   if (power >= 1.4) FX.flash('rgba(255,255,255,0.13)', 0.07);
 
-  att.combo++; att.comboT = 1.1;
+  att.combo++; att.comboT = 1.1; att.comboDmg += dealt;
   if (att.combo >= 2)
     FX.popup(att.x, F.stage.floorY - 270, `${att.combo} HIT${att.combo > 2 ? 'S' : ''}!`,
       att.ch.theme, 26 + Math.min(20, att.combo * 2));
@@ -482,7 +609,14 @@ F.resolveHit = (att, def, m, hx, hy) => {
   if (def.ch.adaptive) def.adaptStacks = Math.min(12, def.adaptStacks + 1);
 
   def.vx = att.facing * m.kb * (1 + power * 0.2);
-  if (m.kup > 250 || m.launcher || def.hp <= 0) {
+  const juggled = def.state === 'launch' || def.airH > 8; // already airborne
+  if (juggled) {
+    // air juggle: pop them back up so the string can continue
+    def.vy = -(Math.max(m.kup, 180) + 150);
+    def.airH = Math.max(def.airH, 0.1);
+    def.flying = false;
+    def.setState('launch');
+  } else if (m.kup > 250 || m.launcher || def.hp <= 0) {
     def.vy = -(Math.max(m.kup, def.hp <= 0 ? 460 : 0) + 140);
     def.airH = Math.max(def.airH, 0.1);
     def.flying = false;
@@ -506,6 +640,7 @@ F.applyDamage = (att, def, dmg, kind, o = {}) => {
   FX.shake(4 + (o.power || 1) * 4);
   def.flashT = 0.12;
   def.hitstop = 0.07; att.hitstop = Math.min(att.hitstop, 0.05);
+  att.combo++; att.comboT = 1.1; att.comboDmg += dealt;
   att.meter = Math.min(100, att.meter + dealt * 0.1);
   if (def.ch.adaptive) def.adaptStacks = Math.min(12, def.adaptStacks + 1);
   def.vx = (def.x >= att.x ? 1 : -1) * (o.kb || 160);
@@ -655,54 +790,138 @@ function drawCine() {
   }
 }
 
-// ---------------- fight HUD ----------------
-function drawHealthBar(f, side) {
-  const x = side === 0 ? 40 : W - 40 - 480;
-  const flip = side === 1;
-  // frame
-  roundRect(x - 3, 27, 486, 30, 6, 'rgba(5,8,15,0.8)', '#222d3d', 2);
-  // health
-  const k = Math.max(0, f.hp / f.maxHp);
-  const hg = ctx.createLinearGradient(x, 0, x + 480, 0);
-  if (k > 0.45) { hg.addColorStop(0, '#ffe97a'); hg.addColorStop(1, '#3fd26b'); }
-  else if (k > 0.2) { hg.addColorStop(0, '#ffba4a'); hg.addColorStop(1, '#ffe97a'); }
-  else { hg.addColorStop(0, '#ff4a4a'); hg.addColorStop(1, '#ff8a4a'); }
-  ctx.fillStyle = hg;
-  const bw = 480 * k;
-  if (flip) ctx.fillRect(x + 480 - bw, 30, bw, 24);
-  else ctx.fillRect(x, 30, bw, 24);
-  // damage shine
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
-  if (flip) ctx.fillRect(x + 480 - bw, 30, bw, 8); else ctx.fillRect(x, 30, bw, 8);
-  // name + portrait
-  const px = flip ? W - 40 - 60 : 40;
+// ---------------- fight HUD (tournament style) ----------------
+function metalText(t, x, y, size, align = 'center') {
   ctx.save();
-  ctx.beginPath(); ctx.roundRect(px, 62, 60, 60, 8); ctx.clip();
-  ctx.fillStyle = '#0c1322'; ctx.fillRect(px, 62, 60, 60);
-  ctx.drawImage(portrait(f.ch.id), px - 7, 56, 74, 100);
+  ctx.font = `900 ${size}px Impact, 'Arial Black', sans-serif`;
+  ctx.textAlign = align;
+  ctx.lineWidth = Math.max(2.5, size / 8);
+  ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+  ctx.strokeText(t, x, y);
+  const g = ctx.createLinearGradient(0, y - size, 0, y + 3);
+  g.addColorStop(0, '#fbfdff'); g.addColorStop(0.5, '#b9c8de'); g.addColorStop(0.55, '#7d8fae');
+  g.addColorStop(1, '#e8f0fb');
+  ctx.fillStyle = g;
+  ctx.fillText(t, x, y);
   ctx.restore();
-  roundRect(px, 62, 60, 60, 8, null, f.ch.theme, 2);
-  drawText(F.cfg.rename2 && side === 1 ? F.cfg.rename2 : f.ch.name,
-    flip ? W - 112 : 112, 82, 20, '#fff', flip ? 'right' : 'left');
-  // super meter
-  const mx = flip ? W - 112 - 300 : 112;
-  roundRect(mx, 92, 300, 12, 4, 'rgba(5,8,15,0.8)', '#222d3d', 1.5);
-  const full = f.meter >= 100;
-  ctx.fillStyle = full ? (Math.sin(G.t * 10) > 0 ? '#fff' : f.ch.theme) : f.ch.theme;
-  ctx.fillRect(mx + 2, 94, 296 * Math.min(1, f.meter / 100), 8);
-  if (full) drawText('FINISHER READY', mx + 150, 88, 11, '#ffd76b');
-  // stamina
-  roundRect(mx, 108, 200, 7, 3, 'rgba(5,8,15,0.8)', '#222d3d', 1);
-  ctx.fillStyle = '#5dc0ff';
-  ctx.fillRect(mx + 1, 109.5, 198 * (f.stamina / 100), 4);
-  // round pips
+}
+
+function drawHealthBar(f, side) {
+  const flip = side === 1;
+  const bw = 470, bh = 26, y = 26;
+  const x0 = flip ? W - 46 - bw : 46;       // outer edge
+  const skew = 16;
+  // skewed plate path (slants toward screen center)
+  const plate = (inset, dy0, dy1) => {
+    ctx.beginPath();
+    if (!flip) {
+      ctx.moveTo(x0 + inset, y + dy0);
+      ctx.lineTo(x0 + bw - inset, y + dy0);
+      ctx.lineTo(x0 + bw - skew - inset, y + bh - dy1);
+      ctx.lineTo(x0 + inset, y + bh - dy1);
+    } else {
+      ctx.moveTo(x0 + inset, y + dy0);
+      ctx.lineTo(x0 + bw - inset, y + dy0);
+      ctx.lineTo(x0 + bw - inset, y + bh - dy1);
+      ctx.lineTo(x0 + skew + inset, y + bh - dy1);
+    }
+    ctx.closePath();
+  };
+  // backdrop + double frame (dark steel with gilt inner line)
+  plate(0, 0, 0);
+  ctx.fillStyle = 'rgba(6,9,16,0.88)'; ctx.fill();
+  ctx.strokeStyle = '#454f66'; ctx.lineWidth = 2.5; ctx.stroke();
+  plate(3, 3, 3);
+  ctx.strokeStyle = 'rgba(214,184,120,0.45)'; ctx.lineWidth = 1; ctx.stroke();
+  // damage trail (drains slowly behind the real bar)
+  ctx.save();
+  plate(4, 4, 4); ctx.clip();
+  const kTrail = Math.max(0, f.dispHp / f.maxHp);
+  const kHp = Math.max(0, f.hp / f.maxHp);
+  ctx.fillStyle = '#b3402c';
+  if (!flip) ctx.fillRect(x0, y, bw * kTrail, bh);
+  else ctx.fillRect(x0 + bw * (1 - kTrail), y, bw * kTrail, bh);
+  // live health: theme-tinted gradient
+  const hg = ctx.createLinearGradient(0, y, 0, y + bh);
+  if (kHp > 0.35) { hg.addColorStop(0, '#e4ffd2'); hg.addColorStop(0.45, '#62d957'); hg.addColorStop(1, '#1f8c3c'); }
+  else { hg.addColorStop(0, '#ffe2b0'); hg.addColorStop(0.45, '#ffae3d'); hg.addColorStop(1, '#c2611c'); }
+  ctx.fillStyle = hg;
+  if (!flip) ctx.fillRect(x0, y, bw * kHp, bh);
+  else ctx.fillRect(x0 + bw * (1 - kHp), y, bw * kHp, bh);
+  // gloss
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fillRect(x0, y + 3, bw, 6);
+  ctx.restore();
+  // name engraved on the plate
+  const name = F.cfg.rename2 && side === 1 ? F.cfg.rename2 : f.ch.name;
+  drawText(name, flip ? x0 + bw - 14 : x0 + 14, y + 19, 17, '#f2f7ff', flip ? 'right' : 'left');
+  // round-win gems (diamonds under the inner end)
   for (let i = 0; i < F.roundsToWin; i++) {
-    const wx = flip ? W - 40 - 480 + 14 + i * 22 : 40 + 480 - 14 - i * 22;
-    ctx.beginPath(); ctx.arc(wx, 14, 7, 0, 6.29);
-    ctx.fillStyle = i < F.wins[side] ? '#ffd76b' : 'rgba(40,55,80,0.9)';
-    ctx.fill();
-    ctx.strokeStyle = '#0a0f1a'; ctx.lineWidth = 2; ctx.stroke();
+    const gx = flip ? x0 + skew + 16 + i * 24 : x0 + bw - skew - 16 - i * 24;
+    const gy = y + bh + 12;
+    ctx.save();
+    ctx.translate(gx, gy); ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = i < F.wins[side] ? '#ffd76b' : 'rgba(30,40,58,0.95)';
+    if (i < F.wins[side]) { ctx.shadowColor = '#ffd76b'; ctx.shadowBlur = 9; }
+    ctx.fillRect(-6, -6, 12, 12);
+    ctx.strokeStyle = '#0a0f1a'; ctx.lineWidth = 2; ctx.strokeRect(-6, -6, 12, 12);
+    ctx.restore();
   }
+  // portrait chip
+  const px = flip ? W - 44 - 52 : 44;
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(px, y + bh + 8, 52, 52, 6); ctx.clip();
+  ctx.drawImage(portraitFace(f.ch.id), px, y + bh + 8, 52, 52);
+  ctx.restore();
+  roundRect(px, y + bh + 8, 52, 52, 6, null, f.ch.theme, 2);
+  // super meter (segmented) + stamina
+  const mx = flip ? px - 8 - 264 : px + 60;
+  const my = y + bh + 16;
+  roundRect(mx, my, 264, 13, 4, 'rgba(6,9,16,0.88)', '#454f66', 1.5);
+  const full = f.meter >= 100;
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(mx + 2, my + 2, 260, 9, 3); ctx.clip();
+  ctx.fillStyle = full ? (Math.sin(G.t * 10) > 0 ? '#ffffff' : f.ch.theme) : f.ch.theme;
+  const mw = 260 * Math.min(1, f.meter / 100);
+  ctx.fillRect(flip ? mx + 262 - mw : mx + 2, my + 2, mw, 9);
+  ctx.fillStyle = 'rgba(6,9,16,0.9)';
+  for (let i = 1; i < 4; i++) ctx.fillRect(mx + 2 + i * 65, my + 2, 2, 9);
+  ctx.restore();
+  if (full) drawText('FINISHER READY', mx + 132, my - 3, 11, '#ffd76b');
+  roundRect(mx, my + 17, 180, 7, 3, 'rgba(6,9,16,0.88)', '#454f66', 1);
+  ctx.fillStyle = '#5dc0ff';
+  const sw = 176 * (f.stamina / 100);
+  ctx.fillRect(flip ? mx + 178 - sw : mx + 2, my + 18.5, sw, 4);
+}
+
+// ornate center timer medallion
+function drawTimerMedallion() {
+  const cx = W / 2, cy = 46;
+  ctx.save();
+  // side wings
+  ctx.fillStyle = '#1a2030';
+  ctx.strokeStyle = '#caa84f'; ctx.lineWidth = 2;
+  for (const sgn of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + sgn * 30, 32);
+    ctx.lineTo(cx + sgn * 78, 38);
+    ctx.lineTo(cx + sgn * 64, 52);
+    ctx.lineTo(cx + sgn * 30, 58);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  }
+  // medallion disc
+  const dg = ctx.createRadialGradient(cx - 8, cy - 10, 4, cx, cy, 38);
+  dg.addColorStop(0, '#2e3a52'); dg.addColorStop(1, '#0a0e18');
+  ctx.fillStyle = dg;
+  ctx.beginPath(); ctx.arc(cx, cy, 36, 0, 6.29); ctx.fill();
+  ctx.strokeStyle = '#caa84f'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(cx, cy, 36, 0, 6.29); ctx.stroke();
+  ctx.strokeStyle = 'rgba(214,184,120,0.4)'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(cx, cy, 30, 0, 6.29); ctx.stroke();
+  const tLeft = Math.max(0, Math.ceil(F.timer));
+  drawText(String(tLeft), cx, cy + 12, 32, tLeft < 15 ? '#ff5a5a' : '#eaf2ff');
+  ctx.restore();
 }
 
 function drawFight(dt) {
@@ -787,11 +1006,29 @@ function drawFight(dt) {
     if (F.phaseT > 1.2) handleVictoryInput();
   }
 
+  // health-bar damage trail eases down after hits
+  for (const f of [F.f1, F.f2]) {
+    if (f.dispHp < f.hp) f.dispHp = f.hp;
+    f.dispHp += (f.hp - f.dispHp) * Math.min(1, dt * 2.4);
+  }
+
   // ---- draw ----
   const [shx, shy] = FX.shakeOffset();
   ctx.save();
   ctx.translate(shx, shy);
   F.stage.draw(ctx, G.t, W, H, F.camX);
+  // polished-floor reflections
+  if (F.stage.reflect) {
+    ctx.save();
+    ctx.translate(0, F.stage.floorY * 2);
+    ctx.scale(1, -1);
+    for (const f of [F.f1, F.f2]) {
+      if (f.entHidden) continue;
+      Humanoid.draw(ctx, f.ch, f.pose, { x: f.x, y: F.stage.floorY, facing: f.facing,
+        scale: 2.5, t: f.t, airH: f.airH, shadow: false, alpha: 0.14 });
+    }
+    ctx.restore();
+  }
   // super dark overlay
   if (F.superBanner && F.superBanner.t > 0) {
     ctx.fillStyle = 'rgba(0,0,10,0.55)';
@@ -804,17 +1041,23 @@ function drawFight(dt) {
   drawCine();
   FX.draw(ctx);
   ctx.restore();
+  // cinematic vignette
+  const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.45, W / 2, H / 2, H * 0.98);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.42)');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
   FX.drawFlash(ctx, W, H);
 
   // HUD
   drawHealthBar(F.f1, 0);
   drawHealthBar(F.f2, 1);
-  // timer
-  roundRect(W / 2 - 44, 18, 88, 52, 8, 'rgba(5,8,15,0.85)', '#2c3a50', 2);
-  drawText(String(Math.max(0, Math.ceil(F.timer))), W / 2, 58, 36,
-    F.timer < 15 ? '#ff5a5a' : '#eaf2ff');
+  drawTimerMedallion();
   if (F.story && F.story.tag)
-    drawText(F.story.tag, W / 2, 92, 16, '#ffd76b');
+    drawText(F.story.tag, W / 2, 104, 16, '#ffd76b');
+  // fighting style names, MK-style, at the bottom corners
+  if (['fight', 'roundbanner'].includes(F.phase)) {
+    metalText(F.f1.ch.styleName || '', 56, H - 18, 30, 'left');
+    metalText(F.f2.ch.styleName || '', W - 56, H - 18, 30, 'right');
+  }
 
   // phase overlays
   if (F.phase === 'entrance') {

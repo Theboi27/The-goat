@@ -71,6 +71,18 @@ const STYLE_TRACKS = {
     hk: [[0, 'spin_w'], [0.55, 'spin_x'], [1, 'stance_toon']] },
 };
 
+// Chain-combo routes: on hit, a normal cancels into these normals
+// (plus special/super). lp->lk->hp->hk natural dial-a-combo flow.
+const CHAINS = {
+  lp: ['lk', 'hp', 'upper'],
+  lk: ['hp', 'hk', 'upper'],
+  hp: ['hk'],
+  upper: ['hk'],
+  hk: [],
+  air_lp: ['air_hk'],
+  air_hk: [],
+};
+
 // idle micro-motion per style — nobody stands like a statue
 const STYLE_IDLE = {
   boxer(p, t) { p.aLf += Math.sin(t * 5.2) * 0.1; p.aRf += Math.cos(t * 4.6) * 0.1;
@@ -186,6 +198,8 @@ class Fighter {
     this.hitConfirmed = false;
     this.combo = 0;
     this.comboT = 0;
+    this.comboDmg = 0;
+    this.dispHp = this.maxHp;   // trailing health-bar display
     this.blockT = -9;            // time block was pressed (for perfect counter)
     this.t = 0;                  // personal clock
     this.hitstop = 0;
@@ -246,7 +260,13 @@ class Fighter {
     if (this.flashT > 0) this.flashT -= dt;
     if (this.superFlash > 0) this.superFlash -= dt;
     this.comboT -= dt;
-    if (this.comboT <= 0) this.combo = 0;
+    if (this.comboT <= 0 && this.combo > 0) {
+      // combo summary banner once the string drops
+      if (this.combo >= 3)
+        FX.popup(this.x, 260, `${this.combo} HIT COMBO — ${this.comboDmg | 0} DMG`, this.ch.theme, 26, 1.3);
+      this.combo = 0;
+      this.comboDmg = 0;
+    }
     this.stamina = Math.min(100, this.stamina + dt * 26);
 
     const effDt = this.slowT > 0 ? dt * 0.1 : dt;
@@ -432,13 +452,21 @@ class Fighter {
     if (t >= this.moveDur) {
       this.whooshed = false;
       this.setState(this.grounded ? 'idle' : 'fall');
-    } else if (this.hitConfirmed && m.cancel && t > m.windup + m.active) {
-      // combo-cancel window: chain into another attack (the Link System)
-      if (this.pressed('lp') || this.pressed('hp') || this.pressed('lk') ||
-          this.pressed('hk') || this.pressed('special')) {
-        this.whooshed = false;
-        this.tryAttacks(opp, game);
+    } else if (this.hitConfirmed && t > m.windup + m.active * 0.5) {
+      // Link System: on hit, chain along combo routes, or cancel into
+      // special/super for big strings
+      const routes = CHAINS[this.moveKey] || [];
+      for (const key of ['lp', 'lk', 'hp', 'hk']) {
+        const down = this.input('downK');
+        const target = (key === 'lp' || key === 'hp') && down ? 'upper' : key;
+        if (this.pressed(key) && routes.includes(target)) {
+          this.whooshed = false;
+          this.startMove(target);
+          return;
+        }
       }
+      if (this.pressed('special')) { this.whooshed = false; this.startSpecial(opp, game); }
+      else if (this.pressed('superK') && this.meter >= 100) { this.whooshed = false; this.startSuper(opp, game); }
     }
   }
 
