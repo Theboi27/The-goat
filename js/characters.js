@@ -412,6 +412,37 @@ for (const [id, [style, stance]] of Object.entries(CHAR_STYLE)) {
 // feminine proportions
 for (const id of ['prisia', 'tsunami', 'glacier']) CHARACTERS[id].visual.fem = true;
 
+// ---- costume construction: per-character gear & armor pieces ----
+// details: chestplate, abs, strap, pouches, kneepads, bracers, skirt
+// chest/skirt/bracer/trunks: optional suit colors for those pieces
+const CHAR_GEAR = {
+  julias:   { details: ['chestplate', 'abs', 'kneepads', 'bracers'], chest: '#212a38', bracer: '#2a3344', trunks: '#0e1116' },
+  shadow:   { details: ['strap', 'pouches', 'kneepads', 'bracers'], bracer: '#1e242e', trunks: '#08090d' },
+  prisia:   { details: ['chestplate', 'skirt', 'bracers'], chest: '#f7f2e4', skirt: '#efe9da', bracer: '#d9b35c', trunks: '#e6dfcf' },
+  tecton:   { details: ['strap', 'kneepads', 'bracers'], bracer: '#5a4630', trunks: '#473827' },
+  lucio:    { details: ['chestplate', 'skirt', 'kneepads'], chest: '#b3bfd8', skirt: '#7d1f1f', bracer: '#8a93a6', trunks: '#4a3b28' },
+  breeze:   { details: ['chestplate', 'bracers', 'kneepads'], chest: '#2a72a8', bracer: '#e8f2f8', trunks: '#123a58' },
+  conrad:   { details: ['abs', 'kneepads', 'bracers'], bracer: '#2c2225', trunks: '#120e10' },
+  reap:     { details: [] },
+  tsunami:  { details: ['chestplate', 'bracers', 'kneepads'], chest: '#117c70', bracer: '#15837a', trunks: '#083833' },
+  kaito:    { details: ['chestplate', 'kneepads', 'bracers'], chest: '#f4f6fa', bracer: '#9aa3b1', trunks: '#aeb6c2' },
+  glacier:  { details: ['chestplate', 'skirt', 'bracers', 'kneepads'], chest: '#9fd2ea', skirt: '#cfeeff', bracer: '#cfeeff', trunks: '#4d8aa8' },
+  gungod:   { details: ['chestplate', 'pouches', 'kneepads', 'bracers', 'strap'], chest: '#4d5668', bracer: '#262b35', trunks: '#262c38' },
+  outsider: { details: ['strap', 'bracers', 'kneepads', 'pouches'], bracer: '#1c2b21', trunks: '#0a0f0c' },
+  kenzo:    { details: ['chestplate', 'skirt', 'bracers'], chest: '#702a2a', skirt: '#2a2a33', bracer: '#3a3f4a', trunks: '#1f1f28' },
+  dreamman: { details: ['chestplate', 'abs', 'kneepads', 'bracers'], chest: '#4a3568', bracer: '#241a36', trunks: '#241a36' },
+  cosmio:   { details: ['chestplate', 'abs', 'kneepads', 'bracers'], chest: '#28344a', bracer: '#2e3a52', trunks: '#10141f' },
+  dreamfix: { details: ['chestplate', 'abs', 'kneepads', 'bracers'], chest: '#355068', bracer: '#1a2536', trunks: '#16202e' },
+};
+for (const [id, gear] of Object.entries(CHAR_GEAR)) {
+  const v = CHARACTERS[id].visual;
+  v.details = gear.details;
+  if (gear.chest) v.suit.chest = gear.chest;
+  if (gear.skirt) v.suit.skirt = gear.skirt;
+  if (gear.bracer) v.suit.bracer = gear.bracer;
+  if (gear.trunks) v.suit.trunks = gear.trunks;
+}
+
 // fighting-style display names (shown on the fight HUD, MK-style)
 const STYLE_NAMES = {
   julias: 'HYPER-FLOW', shadow: 'GHOST ARTS', prisia: 'LUMINANT ARTS',

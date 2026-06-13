@@ -276,6 +276,7 @@ const Humanoid = (() => {
   }
 
   // ---------------- DRAWING HELPERS ----------------
+  const INK = 'rgba(10,12,16,0.55)';   // comic ink outline
   function shade(col, amt) {
     const c = parseInt(col.slice(1), 16);
     let r = (c >> 16) + amt, g = ((c >> 8) & 255) + amt, b = (c & 255) + amt;
@@ -295,6 +296,9 @@ const Humanoid = (() => {
     ctx.arc(b[0], b[1], w2 / 2, ang - Math.PI / 2, ang + Math.PI / 2);
     ctx.closePath();
     ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
     if (hi > 0) {
       const nx = Math.sin(ang), ny = -Math.cos(ang);
       ctx.save();
@@ -331,6 +335,9 @@ const Humanoid = (() => {
     ctx.quadraticCurveTo(c2[0], c2[1], s0[0], s0[1]);
     ctx.closePath();
     ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
     if (hi > 0) {
       ctx.save();
       ctx.globalAlpha = hi;
@@ -452,11 +459,11 @@ const Humanoid = (() => {
     ctx.stroke();
     // mouth
     if (fem) {
-      ctx.strokeStyle = 'rgba(176,84,94,0.95)';
-      ctx.lineWidth = 2.2;
+      ctx.strokeStyle = 'rgba(168,76,86,0.85)';
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(-r * 0.06, r * 0.52);
-      ctx.quadraticCurveTo(r * 0.12, r * 0.6, r * 0.3, r * 0.5);
+      ctx.moveTo(0, r * 0.52);
+      ctx.quadraticCurveTo(r * 0.14, r * 0.58, r * 0.28, r * 0.5);
       ctx.stroke();
       // cheek blush
       ctx.fillStyle = 'rgba(220,120,110,0.13)';
@@ -554,6 +561,9 @@ const Humanoid = (() => {
     ctx.fillStyle = fg;
     headOutline(ctx, r);
     ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.0;
+    ctx.stroke();
 
     if (v.mask === 'none' || v.mask === 'scarred') {
       // ear
@@ -812,12 +822,14 @@ const Humanoid = (() => {
     ctx.restore();
   }
 
-  // main draw entry
+  // main draw entry — comic-inked, costume-constructed figures
   function draw(ctx, ch, p, opts) {
     const v = ch.visual;
     const sc = (opts.scale || 2.5) * (v.heightScale || 1);
     const s = skeleton(p, v.build || 0.3, v.fem);
     const t = opts.t || 0;
+    const det = v.details || [];
+    const has = d => det.includes(d);
     ctx.save();
     ctx.translate(opts.x, opts.y);
     if (opts.shadow !== false) {
@@ -838,7 +850,6 @@ const Humanoid = (() => {
     const bw = s.bw;
     const fem = v.fem;
     const lw = fem ? 0.88 : 1;
-    // limb widths: shoulder->wrist, hip->ankle tapers
     const wArmU = 8.2 * bw * lw, wArmW = 5.2 * bw * lw;
     const wThigh = 10.5 * bw * lw, wAnkle = 5.6 * bw * lw;
     const wKnee = 7.6 * bw * lw, wElbow = 6.4 * bw * lw;
@@ -851,21 +862,48 @@ const Humanoid = (() => {
       ctx.shadowBlur = 12 + Math.sin(t * 6) * 4;
     }
 
-    // muscle-belly emphasis scales with build, softer on feminine frames
     const mus = 1 + (v.build || 0.3) * 0.32 - (fem ? 0.2 : 0);
     const biW = wArmU * 1.28 * mus, caW = wKnee * 1.3 * mus;
     const quW = wThigh * 1.12 * mus, frW = wElbow * 1.14 * mus;
 
-    // ---- far limbs (darker for depth) ----
-    const dk = -42;
+    const bracerCol = suit.bracer || shade(suit.arms, 30);
+
+    // bracer: armored forearm overlay
+    const bracer = (el, hd, dark) => {
+      const a = [el[0] + (hd[0] - el[0]) * 0.3, el[1] + (hd[1] - el[1]) * 0.3];
+      const b = [el[0] + (hd[0] - el[0]) * 0.94, el[1] + (hd[1] - el[1]) * 0.94];
+      taper(ctx, a, b, wElbow * 1.12, wArmW * 1.28, dark ? shade(bracerCol, -24) : bracerCol, 0.1);
+    };
+    // glove cuff ring at the wrist
+    const cuff = (el, hd, col) => {
+      const k = 0.86;
+      ctx.strokeStyle = shade(col, 26);
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.arc(el[0] + (hd[0] - el[0]) * k, el[1] + (hd[1] - el[1]) * k, wArmW * 0.62, 0, 6.29);
+      ctx.stroke();
+    };
+    const kneepad = (kn, dark) => {
+      const col = suit.bracer || shade(suit.boots, 24);
+      ctx.fillStyle = dark ? shade(col, -24) : col;
+      ctx.beginPath();
+      ctx.ellipse(kn[0], kn[1], wKnee * 0.62, wKnee * 0.74, 0, 0, 6.29);
+      ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.9; ctx.stroke();
+    };
+
+    // ---- far limbs (slightly darker for depth) ----
+    const dk = -28;
     muscle(ctx, s.hip, s.knR, wThigh, quW, wKnee, 0.35, shade(suit.legs, dk), 0);
     joint(ctx, s.knR, wKnee, shade(suit.legs, dk));
     muscle(ctx, s.knR, s.ftR, wKnee, caW, wAnkle, 0.3, shade(suit.legs, dk), 0);
-    drawBoot(ctx, s.ftR, s.ftRA, shade(suit.boots, dk));
-    joint(ctx, s.shoulderR, wArmU * 1.05, shade(suit.arms, dk)); // far deltoid
+    if (has('kneepads')) kneepad(s.knR, true);
+    drawBoot(ctx, s.knR, s.ftR, s.ftRA, shade(suit.boots, dk), wAnkle);
+    joint(ctx, s.shoulderR, wArmU * 1.05, shade(suit.arms, dk));
     muscle(ctx, s.shoulderR, s.elR, wArmU, biW, wElbow, 0.42, shade(suit.arms, dk), 0);
     joint(ctx, s.elR, wElbow, shade(suit.arms, dk));
     muscle(ctx, s.elR, s.handR, wElbow, frW, wArmW, 0.3, shade(suit.arms, dk), 0);
+    if (has('bracers')) bracer(s.elR, s.handR, true);
     drawFist(ctx, s.handR, s.handRA, v.gloves ? shade(suit.gloves, dk) : shade(v.skin, dk));
     if (v.weapon) drawWeapon(ctx, ch, s, t);
 
@@ -877,24 +915,12 @@ const Humanoid = (() => {
     tg.addColorStop(0, shade(suit.torso, -22));
     tg.addColorStop(0.55, suit.torso);
     tg.addColorStop(1, shade(suit.torso, 26));
-    ctx.fillStyle = tg;
     const td = [Math.sin(p.torso), -Math.cos(p.torso)];
     const perp = [-td[1], td[0]];
-    // hourglass for feminine builds; strong V-taper for everyone else
     const shW = B.shoulderW * bw * (fem ? 0.78 : 1);
     const hpW = B.hipW * bw + (fem ? 4.0 : 1.2);
-    const waW = fem ? Math.min(shW, hpW) * 0.52 : hpW * 0.82; // waist pinch
-    ctx.beginPath();
-    ctx.moveTo(s.hip[0] - perp[0] * hpW, s.hip[1] - perp[1] * hpW);
-    ctx.quadraticCurveTo(s.belly[0] - perp[0] * waW, s.belly[1] - perp[1] * waW,
-      s.neck[0] - perp[0] * shW, s.neck[1] - perp[1] * shW + 2);
-    ctx.quadraticCurveTo(s.neck[0], s.neck[1] - 4.5, s.neck[0] + perp[0] * shW, s.neck[1] + perp[1] * shW + 2);
-    ctx.quadraticCurveTo(s.belly[0] + perp[0] * waW, s.belly[1] + perp[1] * waW,
-      s.hip[0] + perp[0] * hpW, s.hip[1] + perp[1] * hpW);
-    ctx.closePath();
-    ctx.fill();
-    // trapezius slope: connects neck into the shoulders so the figure
-    // reads athletic instead of pin-headed
+    const waW = fem ? Math.min(shW, hpW) * 0.52 : hpW * 0.82;
+    // trapezius behind/above the torso
     ctx.fillStyle = shade(suit.torso, 16);
     ctx.beginPath();
     ctx.moveTo(s.neck[0] - perp[0] * shW * 0.92, s.neck[1] - perp[1] * shW * 0.92 + 2.5);
@@ -906,7 +932,51 @@ const Humanoid = (() => {
       s.neck[0] - perp[0] * shW * 0.92, s.neck[1] - perp[1] * shW * 0.92 + 2.5);
     ctx.closePath();
     ctx.fill();
-    // rim light on chest
+    ctx.fillStyle = tg;
+    ctx.beginPath();
+    ctx.moveTo(s.hip[0] - perp[0] * hpW, s.hip[1] - perp[1] * hpW);
+    ctx.quadraticCurveTo(s.belly[0] - perp[0] * waW, s.belly[1] - perp[1] * waW,
+      s.neck[0] - perp[0] * shW, s.neck[1] - perp[1] * shW + 2);
+    ctx.quadraticCurveTo(s.neck[0], s.neck[1] - 4.5, s.neck[0] + perp[0] * shW, s.neck[1] + perp[1] * shW + 2);
+    ctx.quadraticCurveTo(s.belly[0] + perp[0] * waW, s.belly[1] + perp[1] * waW,
+      s.hip[0] + perp[0] * hpW, s.hip[1] + perp[1] * hpW);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.0; ctx.stroke();
+
+    // ---- chest plate (sculpted armor panel over the pecs) ----
+    if (has('chestplate')) {
+      const cCol = suit.chest || shade(suit.torso, 20);
+      const cg = ctx.createLinearGradient(s.neck[0] - 8, s.neck[1], s.chest[0] + 6, s.chest[1] + 6);
+      cg.addColorStop(0, shade(cCol, 18));
+      cg.addColorStop(1, shade(cCol, -8));
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.moveTo(s.neck[0] - perp[0] * shW * 0.94, s.neck[1] - perp[1] * shW * 0.94 + 2.5);
+      ctx.quadraticCurveTo(s.neck[0], s.neck[1] - 3.5,
+        s.neck[0] + perp[0] * shW * 0.94, s.neck[1] + perp[1] * shW * 0.94 + 2.5);
+      ctx.quadraticCurveTo(s.chest[0] + perp[0] * shW * 0.72, s.chest[1] + perp[1] * shW * 0.72 + 2,
+        s.chest[0], s.chest[1] + 4.5);
+      ctx.quadraticCurveTo(s.chest[0] - perp[0] * shW * 0.72, s.chest[1] - perp[1] * shW * 0.72 + 2,
+        s.neck[0] - perp[0] * shW * 0.94, s.neck[1] - perp[1] * shW * 0.94 + 2.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.9; ctx.stroke();
+      // pec seams on the plate
+      ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(s.neck[0], s.neck[1] + 1);
+      ctx.lineTo(s.chest[0], s.chest[1] + 3.5);
+      ctx.stroke();
+      for (const sgn of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(s.chest[0] + perp[0] * 4.6 * sgn, s.chest[1] + perp[1] * 4.6 * sgn - 1,
+          4.6, 3.4, p.torso, 0.3, Math.PI - 0.4);
+        ctx.stroke();
+      }
+    }
+    // rim light along the lit side
     ctx.save();
     ctx.globalAlpha = 0.12;
     ctx.strokeStyle = '#ffffff';
@@ -918,7 +988,6 @@ const Humanoid = (() => {
     ctx.stroke();
     ctx.restore();
     if (fem) {
-      // bust: soft highlight above, gentle shadow curve beneath
       for (const sgn of [-1, 1]) {
         ctx.fillStyle = 'rgba(255,255,255,0.09)';
         ctx.beginPath();
@@ -932,19 +1001,48 @@ const Humanoid = (() => {
           4.2, 3.0, p.torso, 0.3, Math.PI - 0.5);
         ctx.stroke();
       }
-    } else {
-      // pecs/abs definition
+    } else if (!has('chestplate')) {
       ctx.strokeStyle = 'rgba(0,0,0,0.18)';
       ctx.lineWidth = 1.1;
       ctx.beginPath();
       ctx.moveTo(s.chest[0], s.chest[1] - 4);
       ctx.lineTo(s.belly[0], s.belly[1]);
       ctx.stroke();
+      for (const sgn of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(s.chest[0] + perp[0] * 4.5 * sgn, s.chest[1] + perp[1] * 4.5 * sgn + 1,
+          4.5, 3, p.torso, 0.2, Math.PI - 0.4);
+        ctx.stroke();
+      }
+    }
+    // ---- abs grid ----
+    if (has('abs') && !fem) {
+      ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.ellipse(s.chest[0] + perp[0] * 4.5, s.chest[1] + perp[1] * 4.5 + 1, 4.5, 3, p.torso, 0.2, Math.PI - 0.4);
+      ctx.moveTo(s.chest[0], s.chest[1] + 5);
+      ctx.lineTo(s.hip[0] + td[0] * 4, s.hip[1] + 1 - 4 * (-td[1]));
       ctx.stroke();
+      for (let i = 0; i < 3; i++) {
+        const k = 0.18 + i * 0.2;
+        const px = s.chest[0] + (s.hip[0] - s.chest[0]) * k;
+        const py = s.chest[1] + (s.hip[1] - s.chest[1]) * k + 4;
+        ctx.beginPath();
+        ctx.moveTo(px - perp[0] * waW * 0.55, py - perp[1] * waW * 0.55);
+        ctx.quadraticCurveTo(px, py + 1.2, px + perp[0] * waW * 0.55, py + perp[1] * waW * 0.55);
+        ctx.stroke();
+      }
+    }
+    // ---- chest strap ----
+    if (has('strap')) {
+      ctx.strokeStyle = shade(suit.belt || '#5d4a33', -18);
+      ctx.lineWidth = 3.2;
       ctx.beginPath();
-      ctx.ellipse(s.chest[0] - perp[0] * 4.5, s.chest[1] - perp[1] * 4.5 + 1, 4.5, 3, p.torso, 0.2, Math.PI - 0.4);
+      ctx.moveTo(s.neck[0] + perp[0] * shW * 0.7, s.neck[1] + perp[1] * shW * 0.7 + 3);
+      ctx.lineTo(s.hip[0] - perp[0] * hpW * 0.75, s.hip[1] - perp[1] * hpW * 0.75 - 1);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+      ctx.lineWidth = 1;
       ctx.stroke();
     }
     // belt
@@ -957,6 +1055,15 @@ const Humanoid = (() => {
       ctx.stroke();
       ctx.fillStyle = shade(suit.belt, 50);
       ctx.fillRect(s.hip[0] + perp[0] * 2 - 2, s.hip[1] + perp[1] * 2 - 4, 4, 4);
+      if (has('pouches')) {
+        ctx.fillStyle = shade(suit.belt, -28);
+        for (const k of [-0.62, -0.1, 0.45]) {
+          ctx.beginPath();
+          ctx.roundRect(s.hip[0] + perp[0] * hpW * k - 2.2, s.hip[1] + perp[1] * hpW * k + 0.5, 4.4, 5.2, 1.2);
+          ctx.fill();
+          ctx.strokeStyle = INK; ctx.lineWidth = 0.7; ctx.stroke();
+        }
+      }
     }
     // stone armor patches (Tecton)
     if (v.stone) {
@@ -999,24 +1106,70 @@ const Humanoid = (() => {
       ? suit.torso : v.skin;
     taper(ctx, [s.neck[0], s.neck[1] + 1.5], s.headC, 5.2 * bw * lw, 4.2 * bw * lw, neckCol, 0);
 
-    // ---- near leg (quad + calf bellies) ----
+    // ---- near leg ----
     muscle(ctx, s.hip, s.knL, wThigh, quW, wKnee, 0.35, suit.legs);
     joint(ctx, s.knL, wKnee, suit.legs);
     muscle(ctx, s.knL, s.ftL, wKnee, caW, wAnkle, 0.3, shade(suit.legs, 4));
-    drawBoot(ctx, s.ftL, s.ftLA, suit.boots);
+    if (has('kneepads')) kneepad(s.knL, false);
+    drawBoot(ctx, s.knL, s.ftL, s.ftLA, suit.boots, wAnkle);
+
+    // ---- pelvis trunks: legs attach to a body, not a point ----
+    const trunkCol = suit.trunks || shade(suit.legs, -14);
+    ctx.fillStyle = trunkCol;
+    ctx.beginPath();
+    ctx.moveTo(s.hip[0] - perp[0] * (hpW + 0.6), s.hip[1] - perp[1] * (hpW + 0.6) - 1.5);
+    ctx.lineTo(s.hip[0] + perp[0] * (hpW + 0.6), s.hip[1] + perp[1] * (hpW + 0.6) - 1.5);
+    ctx.quadraticCurveTo(s.hip[0] + perp[0] * (hpW - 1.2) + 1, s.hip[1] + 7.5,
+      s.hip[0] + 0.5, s.hip[1] + 8.2);
+    ctx.quadraticCurveTo(s.hip[0] - perp[0] * (hpW - 1.2) + 1, s.hip[1] + 7.5,
+      s.hip[0] - perp[0] * (hpW + 0.6), s.hip[1] - perp[1] * (hpW + 0.6) - 1.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 0.9; ctx.stroke();
+
+    // ---- skirt / faulds ----
+    if (has('skirt')) {
+      const skCol = suit.skirt || shade(suit.torso, -6);
+      const sw = Math.sin(t * 2.2) * 1.6;
+      const sg = ctx.createLinearGradient(s.hip[0], s.hip[1], s.hip[0], s.hip[1] + 20);
+      sg.addColorStop(0, shade(skCol, 10));
+      sg.addColorStop(1, shade(skCol, -16));
+      ctx.fillStyle = sg;
+      ctx.beginPath();
+      ctx.moveTo(s.hip[0] - perp[0] * (hpW + 1), s.hip[1] - perp[1] * (hpW + 1) - 2);
+      ctx.lineTo(s.hip[0] + perp[0] * (hpW + 1), s.hip[1] + perp[1] * (hpW + 1) - 2);
+      ctx.quadraticCurveTo(s.hip[0] + perp[0] * (hpW + 3.5) + sw, s.hip[1] + 12,
+        s.hip[0] + perp[0] * (hpW + 1.5) + sw, s.hip[1] + 19);
+      ctx.quadraticCurveTo(s.hip[0] + sw * 0.5, s.hip[1] + 22, s.hip[0] - perp[0] * (hpW + 1.5) + sw, s.hip[1] + 19);
+      ctx.quadraticCurveTo(s.hip[0] - perp[0] * (hpW + 3.5) + sw, s.hip[1] + 12,
+        s.hip[0] - perp[0] * (hpW + 1), s.hip[1] - perp[1] * (hpW + 1) - 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.9; ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+      ctx.lineWidth = 1;
+      for (const k of [-0.45, 0.1, 0.6]) {
+        ctx.beginPath();
+        ctx.moveTo(s.hip[0] + perp[0] * hpW * k, s.hip[1] + 1);
+        ctx.lineTo(s.hip[0] + perp[0] * (hpW + 1.8) * k + sw, s.hip[1] + 18);
+        ctx.stroke();
+      }
+    }
 
     // ---- head ----
     drawHead(ctx, ch, s, t);
     if (v.railgun) drawRailgun(ctx, s);
 
-    // ---- near arm (deltoid + bicep/forearm bellies + fist) ----
+    // ---- near arm ----
     joint(ctx, s.shoulderL, wArmU * 1.12, shade(suit.arms, 14));
     muscle(ctx, s.shoulderL, s.elL, wArmU, biW, wElbow, 0.42, suit.arms);
     joint(ctx, s.elL, wElbow, suit.arms);
     muscle(ctx, s.elL, s.handL, wElbow, frW, wArmW, 0.3, shade(suit.arms, 5));
+    if (has('bracers')) bracer(s.elL, s.handL, false);
+    if (v.gloves) cuff(s.elL, s.handL, suit.gloves);
     drawFist(ctx, s.handL, s.handLA, v.gloves ? suit.gloves : v.skin);
 
-    // powered-suit glow: gauntlet bands and boot soles (hero-tech look)
+    // powered-suit glow accents
     if (v.glow) {
       const band = (a, b, k0, k1, w) => {
         ctx.save();
@@ -1034,7 +1187,6 @@ const Humanoid = (() => {
       band(s.knL, s.ftL, 0.8, 0.97, wAnkle * 0.8);
       band(s.knR, s.ftR, 0.8, 0.97, wAnkle * 0.65);
     }
-    // lightning glyph on the shoulder
     if (v.boltAccents) {
       ctx.save();
       ctx.fillStyle = v.boltAccents;
@@ -1047,7 +1199,6 @@ const Humanoid = (() => {
       ctx.restore();
     }
 
-    // impact-frame additive glow
     if (opts.flash) {
       ctx.globalCompositeOperation = 'lighter';
       ctx.fillStyle = 'rgba(255,255,255,0.28)';
@@ -1058,7 +1209,20 @@ const Humanoid = (() => {
     ctx.restore();
   }
 
-  function drawBoot(ctx, ft, ang, color) {
+  // real boot: shaft rising up the calf, cuff line, shaped foot + sole
+  function drawBoot(ctx, kn, ft, ang, color, w) {
+    const sx = kn[0] + (ft[0] - kn[0]) * 0.45, sy = kn[1] + (ft[1] - kn[1]) * 0.45;
+    taper(ctx, [sx, sy], ft, w * 1.55, w * 1.3, color, 0.08);
+    // cuff
+    const la = Math.atan2(ft[1] - kn[1], ft[0] - kn[0]);
+    const nx = Math.cos(la - Math.PI / 2), ny = Math.sin(la - Math.PI / 2);
+    ctx.strokeStyle = shade(color, 26);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(sx + nx * w * 0.78, sy + ny * w * 0.78);
+    ctx.lineTo(sx - nx * w * 0.78, sy - ny * w * 0.78);
+    ctx.stroke();
+    // foot
     ctx.save();
     ctx.translate(ft[0], ft[1]);
     const lean = Math.sin(ang);
@@ -1073,6 +1237,7 @@ const Humanoid = (() => {
     ctx.lineTo(-4 + lean * 2, 2.5);
     ctx.closePath();
     ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 0.9; ctx.stroke();
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.fillRect(-4 + lean * 2, 1.2, B.foot + 6, 1.4);
     ctx.restore();
@@ -1086,6 +1251,7 @@ const Humanoid = (() => {
     ctx.beginPath();
     ctx.roundRect(-4.0, -3.0, 8.0, 7.2, 2.8);
     ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 0.9; ctx.stroke();
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
     ctx.fillRect(-3.5, 0.8, 7.0, 1.2); // knuckle line
     ctx.restore();
