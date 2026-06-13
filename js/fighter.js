@@ -5,21 +5,22 @@
 
 // Frame data in seconds: windup -> active -> recover.
 // track: keyframe pose animation across the whole move duration.
+// lunge: forward drive during the strike — gives attacks body weight.
 const MOVES = {
   lp: { dmg: 38, windup: 0.07, active: 0.06, recover: 0.12, reach: 62, h: 88,
-    kb: 90, kup: 0, stun: 0.26, sfx: 'punch', power: 0.7, cancel: true,
+    kb: 90, kup: 0, stun: 0.26, sfx: 'punch', power: 0.7, cancel: true, lunge: 60,
     track: [[0, 'jab_w'], [0.45, 'jab_x'], [1, 'idle']] },
   hp: { dmg: 72, windup: 0.16, active: 0.08, recover: 0.24, reach: 70, h: 92,
-    kb: 230, kup: 60, stun: 0.42, sfx: 'heavy', power: 1.3,
+    kb: 230, kup: 60, stun: 0.42, sfx: 'heavy', power: 1.3, lunge: 150,
     track: [[0, 'cross_w'], [0.5, 'cross_x'], [1, 'idle']] },
   lk: { dmg: 44, windup: 0.09, active: 0.07, recover: 0.15, reach: 78, h: 60,
-    kb: 120, kup: 0, stun: 0.3, sfx: 'kick', power: 0.85, cancel: true,
+    kb: 120, kup: 0, stun: 0.3, sfx: 'kick', power: 0.85, cancel: true, lunge: 80,
     track: [[0, 'fkick_w'], [0.45, 'fkick_x'], [1, 'idle']] },
   hk: { dmg: 84, windup: 0.2, active: 0.09, recover: 0.28, reach: 92, h: 96,
-    kb: 300, kup: 170, stun: 0.5, sfx: 'heavy', power: 1.6,
+    kb: 300, kup: 170, stun: 0.5, sfx: 'heavy', power: 1.6, lunge: 170,
     track: [[0, 'round_w'], [0.55, 'round_x'], [1, 'idle']] },
   upper: { dmg: 78, windup: 0.15, active: 0.08, recover: 0.3, reach: 56, h: 110,
-    kb: 140, kup: 430, stun: 0.5, sfx: 'heavy', power: 1.5, launcher: true,
+    kb: 140, kup: 430, stun: 0.5, sfx: 'heavy', power: 1.5, launcher: true, lunge: 70,
     track: [[0, 'upper_w'], [0.5, 'upper_x'], [1, 'idle']] },
   air_lp: { dmg: 42, windup: 0.06, active: 0.08, recover: 0.1, reach: 64, h: 80,
     kb: 110, kup: -80, stun: 0.3, sfx: 'punch', power: 0.8, air: true,
@@ -27,6 +28,68 @@ const MOVES = {
   air_hk: { dmg: 80, windup: 0.12, active: 0.1, recover: 0.18, reach: 86, h: 70,
     kb: 260, kup: -260, stun: 0.45, sfx: 'heavy', power: 1.5, air: true,
     track: [[0, 'round_w'], [0.5, 'round_x'], [1, 'fall']] },
+};
+
+// Per-style attack animations: same frame data, different body language.
+// Each track ends in the style's own stance for seamless recovery.
+const STYLE_TRACKS = {
+  allround: {},
+  boxer: { // hooks, knees — infighter
+    hp: [[0, 'hook_w'], [0.5, 'hook_x'], [1, 'stance_boxer']],
+    lk: [[0, 'knee_w'], [0.45, 'knee_x'], [1, 'stance_boxer']],
+    lp: [[0, 'jab_w'], [0.45, 'jab_x'], [1, 'stance_boxer']],
+    hk: [[0, 'cross_w'], [0.55, 'cross_x'], [1, 'stance_boxer']] },
+  ninja: { // backfists, elbows, spinning kicks
+    lp: [[0, 'palm_w'], [0.45, 'palm_x'], [1, 'stance_ninja']],
+    hp: [[0, 'hook_w'], [0.5, 'elbow_x'], [1, 'stance_ninja']],
+    lk: [[0, 'fkick_w'], [0.45, 'fkick_x'], [1, 'stance_ninja']],
+    hk: [[0, 'spin_w'], [0.55, 'spin_x'], [1, 'stance_ninja']] },
+  blade: { // weapon arcs and lunges
+    lp: [[0, 'slashH_w'], [0.45, 'slashH_x'], [1, 'stance_blade']],
+    hp: [[0, 'slashV_w'], [0.5, 'slashV_x'], [1, 'stance_blade']],
+    lk: [[0, 'fkick_w'], [0.45, 'fkick_x'], [1, 'stance_blade']],
+    hk: [[0, 'lunge_w'], [0.55, 'lunge_x'], [1, 'stance_blade']] },
+  heavy: { // overhead smashes and sweeps
+    lp: [[0, 'jab_w'], [0.45, 'jab_x'], [1, 'stance_heavy']],
+    hp: [[0, 'axe_w'], [0.5, 'axe_x'], [1, 'stance_heavy']],
+    lk: [[0, 'knee_w'], [0.45, 'knee_x'], [1, 'stance_heavy']],
+    hk: [[0, 'sweep_w'], [0.55, 'sweep_x'], [1, 'stance_heavy']] },
+  flow: { // palms and high spinning kicks
+    lp: [[0, 'palm_w'], [0.45, 'palm_x'], [1, 'stance_flow']],
+    hp: [[0, 'cast_w'], [0.5, 'palm_x'], [1, 'stance_flow']],
+    lk: [[0, 'fkick_w'], [0.45, 'fkick_x'], [1, 'stance_flow']],
+    hk: [[0, 'spin_w'], [0.55, 'spin_x'], [1, 'stance_flow']] },
+  caster: { // energy-laced palm strikes
+    lp: [[0, 'palm_w'], [0.45, 'palm_x'], [1, 'stance_caster']],
+    hp: [[0, 'cast_w'], [0.5, 'cast'], [1, 'stance_caster']],
+    lk: [[0, 'fkick_w'], [0.45, 'fkick_x'], [1, 'stance_caster']],
+    hk: [[0, 'round_w'], [0.55, 'round_x'], [1, 'stance_caster']] },
+  toon: { // limbs stretch across the screen
+    lp: [[0, 'stretchP_w'], [0.45, 'stretchP_x'], [1, 'stance_toon']],
+    hp: [[0, 'stretchP_w'], [0.5, 'stretchB_x'], [1, 'stance_toon']],
+    lk: [[0, 'fkick_w'], [0.45, 'fkick_x'], [1, 'stance_toon']],
+    hk: [[0, 'spin_w'], [0.55, 'spin_x'], [1, 'stance_toon']] },
+};
+
+// idle micro-motion per style — nobody stands like a statue
+const STYLE_IDLE = {
+  boxer(p, t) { p.aLf += Math.sin(t * 5.2) * 0.1; p.aRf += Math.cos(t * 4.6) * 0.1;
+    p.hipY += Math.sin(t * 5.2) * 0.8; p.torso += Math.sin(t * 2.4) * 0.02; },
+  ninja(p, t) { p.hipY += Math.sin(t * 3.2) * 1.0; p.aLu += Math.sin(t * 2.2) * 0.08;
+    p.head += Math.sin(t * 1.4) * 0.04; },
+  blade(p, t) { p.aRu += Math.sin(t * 1.8) * 0.05; p.aRf += Math.cos(t * 2.1) * 0.05;
+    p.hipY += Math.sin(t * 2.4) * 0.9; },
+  heavy(p, t) { p.hipY += Math.sin(t * 2.0) * 1.1; p.torso += Math.sin(t * 2.0) * 0.025;
+    p.aLu += Math.sin(t * 2.0) * 0.05; p.aRu -= Math.sin(t * 2.0) * 0.05; },
+  flow(p, t) { p.aLu += Math.sin(t * 2.3) * 0.2; p.aRu += Math.cos(t * 2.0) * 0.16;
+    p.aLf += Math.sin(t * 2.6 + 1) * 0.14; p.hipY += Math.abs(Math.sin(t * 4.6)) * 1.8; },
+  caster(p, t) { p.aLf += Math.sin(t * 2.0) * 0.08; p.aLu += Math.sin(t * 1.6) * 0.06;
+    p.hipY += Math.sin(t * 2.4) * 0.8; p.head += Math.sin(t * 1.2) * 0.02; },
+  toon(p, t) { p.torso += Math.sin(t * 1.6) * 0.06; p.head += Math.sin(t * 2.2) * 0.06;
+    p.aLu += Math.sin(t * 1.9) * 0.1; p.aRu += Math.cos(t * 1.7) * 0.1;
+    p.hipY += Math.sin(t * 1.6) * 1.6; },
+  allround(p, t) { p.hipY += Math.sin(t * 2.6) * 1.1; p.aLf += Math.sin(t * 2.8) * 0.07;
+    p.aRf += Math.cos(t * 2.4) * 0.06; p.head += Math.sin(t * 1.5) * 0.025; },
 };
 
 class Projectile {
@@ -339,16 +402,27 @@ class Fighter {
   }
 
   startMove(key) {
-    const m = MOVES[key];
-    this.move = m; this.moveKey = key;
+    const base = MOVES[key];
+    const styled = STYLE_TRACKS[this.ch.style || 'allround'];
+    let track = (styled && styled[key]) || base.track;
+    // recover into this character's own stance
+    if (track[track.length - 1][1] === 'idle' && this.ch.stance)
+      track = track.slice(0, -1).concat([[1, this.ch.stance]]);
+    this.move = { ...base, track };
+    this.moveKey = key;
     this.hitConfirmed = false;
-    this.setState('attack', m.windup + m.active + m.recover);
+    this.setState('attack', base.windup + base.active + base.recover);
     return true;
   }
 
   attackUpdate(dt, opp, game) {
     const m = this.move;
     const t = this.stateT;
+    // forward drive through the strike — weight transfer
+    if (m.lunge && this.grounded && t < m.windup + m.active) {
+      const k = Math.min(1, t / Math.max(0.01, m.windup)); // ramp in
+      this.x += this.facing * m.lunge * k * dt;
+    }
     // whoosh at active start
     if (!this.whooshed && t >= m.windup) { AudioSys.sfx('whoosh'); this.whooshed = true; }
     if (t < m.windup + m.active && t >= m.windup && !this.hitConfirmed) {
@@ -369,7 +443,7 @@ class Fighter {
   }
 
   checkHit(opp, game, m) {
-    const reach = m.reach * this.ch.stats.reach * (this.ch.toon ? 1.25 : 1);
+    const reach = m.reach * this.ch.stats.reach * (this.ch.toon ? 1.5 : 1);
     const hx = this.x + this.facing * reach;
     const hy = game.stage.floorY - this.airH - m.h;
     // opponent body box
@@ -605,13 +679,22 @@ class Fighter {
 
   updatePoseOnly(dt) {
     let target;
-    const breathe = Math.sin(this.t * 2.6) * 1.2;
     switch (this.state) {
-      case 'idle': target = { ...Humanoid.pose('idle') }; target.hipY += breathe * 0.6; break;
+      case 'idle': {
+        // signature stance + living micro-motion
+        target = { ...Humanoid.pose(this.ch.stance || 'idle') };
+        (STYLE_IDLE[this.ch.style] || STYLE_IDLE.allround)(target, this.t);
+        break;
+      }
       case 'walk': {
-        const k = (this.t * 5 * this.speedMul) % 2;
+        const wt = this.t * 5 * this.speedMul;
+        const k = wt % 2;
         target = k < 1 ? Humanoid.lerp(Humanoid.pose('walk1'), Humanoid.pose('walk2'), k)
                        : Humanoid.lerp(Humanoid.pose('walk2'), Humanoid.pose('walk1'), k - 1);
+        // gait bob + counter-sway: weight shifts with each step
+        target.hipY += Math.abs(Math.sin(wt * Math.PI)) * 1.8;
+        target.torso += Math.sin(wt * Math.PI) * 0.04;
+        target.head -= Math.sin(wt * Math.PI) * 0.03;
         break;
       }
       case 'jump': target = Humanoid.pose('jump'); break;
@@ -620,7 +703,7 @@ class Fighter {
       case 'block': target = Humanoid.pose('block'); break;
       case 'dash': target = Humanoid.pose('dash'); break;
       case 'fly': target = Humanoid.pose('fly'); break;
-      case 'attack': target = Humanoid.sample(this.move.track, this.stateT / this.moveDur); break;
+      case 'attack': target = Humanoid.sample(this.move.track, this.stateT / this.moveDur, 'attack'); break;
       case 'special': {
         const sp = this.ch.special;
         const tk = sp.kind === 'dashstrike'
@@ -659,11 +742,15 @@ class Fighter {
         target = Humanoid.lerp(Humanoid.pose('idle'), Humanoid.pose(this.ch.boss ? 'win2' : 'win'), wk);
         break;
       }
-      default: target = Humanoid.pose('idle');
+      default: target = Humanoid.pose(this.ch.stance || 'idle');
     }
-    // critically-damped blend toward target = fluid, lag-free transitions
-    const k = Math.min(1, dt * 18);
-    this.pose = this.pose ? Humanoid.lerp(this.pose, target, Math.max(k, this.hitstop > 0 ? 0 : k)) : target;
+    // critically-damped blend toward target: strikes snap (fast blend),
+    // recoveries and idles settle softly — fluid, human weight.
+    const rate = this.state === 'attack' || this.state === 'super' || this.state === 'special' ? 30
+      : this.state === 'hit' || this.state === 'launch' ? 24
+      : this.state === 'dash' ? 22 : 12;
+    const k = Math.min(1, dt * rate);
+    this.pose = this.pose ? Humanoid.lerp(this.pose, target, k) : target;
   }
 
   draw(ctx, game) {

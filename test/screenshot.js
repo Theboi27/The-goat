@@ -22,8 +22,8 @@ const fs = require('fs');
 
   await key('KeyS', 2);            // VERSUS (2 PLAYERS)
   await key('KeyJ'); await wait(400);
-  await key('KeyD', 2);            // P1 browses to Prisia
-  await key('ArrowRight', 3);      // P2 browses to Tecton
+  await key('KeyD', 6);            // P1 browses to Conrad (boxer stance)
+  await key('ArrowRight', 13);     // P2 browses to Kenzo (iaido stance)
   await shot('2-select');
   await key('KeyJ');               // P1 locks
   await wait(300); await shot('3-select-locked');

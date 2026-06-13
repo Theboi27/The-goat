@@ -253,8 +253,10 @@ function drawSelectPanel(side, id, locked, fxT) {
   } else if (locked) {
     pose = Humanoid.pose(ch.selectFx === 'smoke' ? 'crouch' : 'win');
   } else {
-    const p = { ...Humanoid.pose('idle') };
+    // show the character's signature fighting stance, breathing
+    const p = { ...Humanoid.pose(ch.stance || 'idle') };
     p.hipY += Math.sin(t * 2.4) * 1.5;
+    p.head += Math.sin(t * 1.6) * 0.03;
     pose = p;
   }
   Humanoid.draw(ctx, ch, pose, { x, y: baseY, facing: side === 0 ? 1 : -1,

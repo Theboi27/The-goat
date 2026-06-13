@@ -381,6 +381,35 @@ const ROSTER = ['julias','shadow','prisia','tecton','lucio','breeze','conrad','r
                 'tsunami','kaito','glacier','gungod','outsider','kenzo','dreamman'];
 const SECRET_ROSTER = ['cosmio','dreamfix'];
 
+// ---- fighting styles & signature stances ----
+// style picks the attack-animation set (see STYLE_TRACKS in fighter.js);
+// stance is the character's signature idle pose.
+const CHAR_STYLE = {
+  julias:   ['allround', 'idle'],          // disciplined all-range champion
+  shadow:   ['ninja',    'stance_ninja'],  // low stealth crouch, palm strikes
+  prisia:   ['caster',   'stance_caster'], // upright, leading palm of light
+  tecton:   ['heavy',    'stance_heavy'],  // wide grappler, overhead smashes
+  lucio:    ['blade',    'stance_blade'],  // gladius forward, legion guard
+  breeze:   ['flow',     'stance_flow'],   // bouncing speedster, spin kicks
+  conrad:   ['boxer',    'stance_boxer'],  // chin tucked, hooks and knees
+  reap:     ['toon',     'stance_toon'],   // looming slouch, stretch punches
+  tsunami:  ['flow',     'stance_flow'],   // flowing hydro forms
+  kaito:    ['flow',     'stance_flow'],   // airy martial arts
+  glacier:  ['heavy',    'stance_heavy'],  // immovable bastion
+  gungod:   ['heavy',    'stance_gun'],    // braced military frame
+  outsider: ['ninja',    'stance_ninja'],  // cyber-shinobi crouch
+  kenzo:    ['blade',    'stance_iaido'],  // side-on, hand at the hilt
+  dreamman: ['caster',   'stance_regal'],  // hands behind back, untouchable
+  cosmio:   ['allround', 'idle'],
+  dreamfix: ['caster',   'stance_regal'],
+};
+for (const [id, [style, stance]] of Object.entries(CHAR_STYLE)) {
+  CHARACTERS[id].style = style;
+  CHARACTERS[id].stance = stance;
+}
+// feminine proportions
+for (const id of ['prisia', 'tsunami', 'glacier']) CHARACTERS[id].visual.fem = true;
+
 function rosterIds() {
   const unlocked = localStorage.getItem('skcr_unlocked') === '1';
   return unlocked ? ROSTER.concat(SECRET_ROSTER) : ROSTER.slice();

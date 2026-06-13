@@ -60,10 +60,14 @@ try {
 
 // ---------- drive frames ----------
 let now = 0;
-function press(code) {
+function hold(code) {
   keyHandlers.keydown.forEach(fn => fn({ code, key: code, preventDefault() {} }));
 }
 function release(code) { keyHandlers.keyup.forEach(fn => fn({ code, key: code })); }
+function press(code) {
+  hold(code);
+  release(code); // tap: release immediately so repeat presses register
+}
 function frames(n, perFrame) {
   for (let i = 0; i < n; i++) {
     const q = rafQueue; rafQueue = [];
@@ -92,7 +96,7 @@ try {
     if (i % 7 === 0) {
       held.forEach(release); held = [];
       const k = keys[Math.floor(Math.random() * keys.length)];
-      press(k); held.push(k);
+      hold(k); held.push(k);
     }
   });
   // mash continue through KO/round/victory screens
