@@ -442,14 +442,17 @@ const Humanoid = (() => {
           ctx.fill();
         }
       }
-      // eyes (with optional glow)
+      // eyes — crisp sclera, iris with only a faint power glow so the
+      // face stays readable as a face
       const ec = v.eyes && v.eyes.glow ? v.eyes.glow : '#33302a';
-      if (v.eyes && v.eyes.glow) { ctx.shadowColor = ec; ctx.shadowBlur = 6; }
       ctx.fillStyle = '#f4f1ea';
-      ctx.beginPath(); ctx.ellipse(fx, -r * 0.1, r * 0.2, r * 0.115, -0.05, 0, 6.29); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(fx, -r * 0.1, r * 0.19, r * 0.105, -0.05, 0, 6.29); ctx.fill();
+      if (v.eyes && v.eyes.glow) { ctx.shadowColor = ec; ctx.shadowBlur = 2.5; }
       ctx.fillStyle = ec;
-      ctx.beginPath(); ctx.arc(fx + r * 0.06, -r * 0.1, r * 0.075, 0, 6.29); ctx.fill();
+      ctx.beginPath(); ctx.arc(fx + r * 0.055, -r * 0.1, r * 0.062, 0, 6.29); ctx.fill();
       ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.beginPath(); ctx.arc(fx + r * 0.06, -r * 0.1, r * 0.026, 0, 6.29); ctx.fill(); // pupil
       // brow
       ctx.strokeStyle = v.hair ? shade(v.hair.color, 14) : '#2c2620';
       ctx.lineWidth = 1.7;
@@ -459,7 +462,17 @@ const Humanoid = (() => {
       ctx.strokeStyle = 'rgba(70,40,30,0.5)';
       ctx.lineWidth = 1.3;
       ctx.beginPath(); ctx.moveTo(fx + r * 0.32, -r * 0.04); ctx.quadraticCurveTo(fx + r * 0.45, r * 0.12, fx + r * 0.3, r * 0.2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(fx - r * 0.02, r * 0.45); ctx.quadraticCurveTo(fx + r * 0.16, r * 0.52, fx + r * 0.32, r * 0.42); ctx.stroke();
+      if (v.fem) {
+        // lashes + softer brow line, tinted lips
+        ctx.strokeStyle = 'rgba(20,12,10,0.85)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(fx - r * 0.16, -r * 0.225); ctx.quadraticCurveTo(fx + r * 0.08, -r * 0.28, fx + r * 0.24, -r * 0.22); ctx.stroke();
+        ctx.strokeStyle = 'rgba(168,72,84,0.9)';
+        ctx.lineWidth = 2.1;
+        ctx.beginPath(); ctx.moveTo(fx + r * 0.02, r * 0.45); ctx.quadraticCurveTo(fx + r * 0.16, r * 0.53, fx + r * 0.3, r * 0.43); ctx.stroke();
+      } else {
+        ctx.beginPath(); ctx.moveTo(fx - r * 0.02, r * 0.45); ctx.quadraticCurveTo(fx + r * 0.16, r * 0.52, fx + r * 0.32, r * 0.42); ctx.stroke();
+      }
       // scars (Tsunami post-Mumbai)
       if (v.mask === 'scarred') {
         ctx.strokeStyle = 'rgba(190,90,70,0.7)';
@@ -487,7 +500,42 @@ const Humanoid = (() => {
       ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.moveTo(fx - r * 0.02, r * 0.48); ctx.lineTo(fx + r * 0.26, r * 0.44); ctx.stroke();
       drawGlowEyes(ctx, v, fx, r);
-    } else if (v.mask === 'full' || v.mask === 'shadow') {
+    } else if (v.mask === 'shadow') {
+      // uncanny: round staring white eyes (mismatched heights and sizes)
+      // and a thin ear-to-ear white grin that is just a little too wide
+      ctx.save();
+      ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 9;
+      ctx.fillStyle = '#fdfdfd';
+      ctx.beginPath(); ctx.arc(fx, -r * 0.14, r * 0.18, 0, 6.29); ctx.fill();
+      ctx.beginPath(); ctx.arc(fx - r * 0.55, -r * 0.24, r * 0.125, 0, 6.29); ctx.fill();
+      // pinprick pupils, not quite looking the same direction
+      ctx.shadowBlur = 0; ctx.fillStyle = '#0b0a10';
+      ctx.beginPath(); ctx.arc(fx + r * 0.04, -r * 0.12, r * 0.045, 0, 6.29); ctx.fill();
+      ctx.beginPath(); ctx.arc(fx - r * 0.52, -r * 0.27, r * 0.033, 0, 6.29); ctx.fill();
+      // the grin
+      ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 7;
+      ctx.fillStyle = '#fdfdfd';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.66, r * 0.26);
+      ctx.quadraticCurveTo(fx * 0.3, r * 0.92, fx + r * 0.44, r * 0.14);
+      ctx.quadraticCurveTo(fx * 0.3, r * 0.6, -r * 0.66, r * 0.26);
+      ctx.closePath();
+      ctx.fill();
+      // teeth seams
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(11,10,16,0.8)';
+      ctx.lineWidth = 0.8;
+      for (let i = 1; i < 7; i++) {
+        const k = i / 7;
+        const sx = -r * 0.6 + (fx + r * 0.4 + r * 0.6) * k;
+        const sy = r * 0.34 + Math.sin(k * Math.PI) * r * 0.26;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - r * 0.07);
+        ctx.lineTo(sx, sy + r * 0.07);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (v.mask === 'full') {
       drawGlowEyes(ctx, v, fx, r);
     } else if (v.mask === 'helmet') {
       if (v.crest) {
@@ -708,9 +756,10 @@ const Humanoid = (() => {
     ctx.fillStyle = tg;
     const td = [Math.sin(p.torso), -Math.cos(p.torso)];
     const perp = [-td[1], td[0]];
-    const shW = B.shoulderW * bw * (fem ? 0.86 : 1);
-    const hpW = B.hipW * bw + (fem ? 2.6 : 1.2);
-    const waW = hpW * (fem ? 0.72 : 0.92); // waist pinch
+    // hourglass for feminine builds: soft shoulders, cinched waist, full hips
+    const shW = B.shoulderW * bw * (fem ? 0.78 : 1);
+    const hpW = B.hipW * bw + (fem ? 4.0 : 1.2);
+    const waW = fem ? Math.min(shW, hpW) * 0.52 : hpW * 0.92; // waist pinch
     ctx.beginPath();
     ctx.moveTo(s.hip[0] - perp[0] * hpW, s.hip[1] - perp[1] * hpW);
     ctx.quadraticCurveTo(s.belly[0] - perp[0] * waW, s.belly[1] - perp[1] * waW,
@@ -731,19 +780,36 @@ const Humanoid = (() => {
       s.belly[0] + perp[0] * waW * 0.9, s.belly[1] + perp[1] * waW * 0.9);
     ctx.stroke();
     ctx.restore();
-    // pecs/abs definition
-    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-    ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    ctx.moveTo(s.chest[0], s.chest[1] - 4);
-    ctx.lineTo(s.belly[0], s.belly[1]);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse(s.chest[0] + perp[0] * 4.5, s.chest[1] + perp[1] * 4.5 + 1, 4.5, 3, p.torso, 0.2, Math.PI - 0.4);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse(s.chest[0] - perp[0] * 4.5, s.chest[1] - perp[1] * 4.5 + 1, 4.5, 3, p.torso, 0.2, Math.PI - 0.4);
-    ctx.stroke();
+    if (fem) {
+      // bust: soft highlight above, gentle shadow curve beneath
+      for (const sgn of [-1, 1]) {
+        ctx.fillStyle = 'rgba(255,255,255,0.09)';
+        ctx.beginPath();
+        ctx.ellipse(s.chest[0] + perp[0] * 3.6 * sgn, s.chest[1] + perp[1] * 3.6 * sgn + 0.5,
+          4.2, 3.2, p.torso, 0, 6.29);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.16)';
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.ellipse(s.chest[0] + perp[0] * 3.6 * sgn, s.chest[1] + perp[1] * 3.6 * sgn + 1.5,
+          4.2, 3.0, p.torso, 0.3, Math.PI - 0.5);
+        ctx.stroke();
+      }
+    } else {
+      // pecs/abs definition
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(s.chest[0], s.chest[1] - 4);
+      ctx.lineTo(s.belly[0], s.belly[1]);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(s.chest[0] + perp[0] * 4.5, s.chest[1] + perp[1] * 4.5 + 1, 4.5, 3, p.torso, 0.2, Math.PI - 0.4);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(s.chest[0] - perp[0] * 4.5, s.chest[1] - perp[1] * 4.5 + 1, 4.5, 3, p.torso, 0.2, Math.PI - 0.4);
+      ctx.stroke();
+    }
     // belt
     if (suit.belt) {
       ctx.strokeStyle = suit.belt;

@@ -149,8 +149,8 @@ const CHARACTERS = {
     sup: { kind: 'rush', name: 'UNBOUND RAGE', dmg: 245, hits: 10, color: '#ff7a6a', shake: true, sfx: 'heavy',
       quote: 'They kept me in a helmet for years. FEEL THIS.' },
     visual: {
-      skin: '#caa384', build: 0.75, heightScale: 1.03,
-      mask: 'none', hair: { style: 'spiky', color: '#1c1714' }, eyes: { glow: '#ff8d7a' }, gloves: false,
+      skin: '#7a4e32', build: 0.75, heightScale: 1.03,
+      mask: 'none', hair: { style: 'spiky', color: '#16100c' }, eyes: { glow: '#ff8d7a' }, gloves: false,
       suit: { torso: '#1a1416', arms: '#221a1c', legs: '#161113', boots: '#2c2225', gloves: '#221a1c', belt: '#542c28' },
       emblem: { type: 'none' }, aura: 'rgba(255,90,70,0.45)',
       cape: null,
