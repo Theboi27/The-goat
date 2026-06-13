@@ -92,11 +92,20 @@ try {
   // brawl: ~40s of random inputs
   const keys = ['KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyJ', 'KeyU', 'KeyK', 'KeyI', 'KeyL', 'KeyO', 'ShiftLeft'];
   let held = [];
+  // sample combat state DURING the brawl — a finished match rematches
+  // with fresh HP, so checking only at the end races the rematch
+  let maxDmg1 = 0, maxDmg2 = 0, sawKo = false;
   frames(2400, i => {
     if (i % 7 === 0) {
       held.forEach(release); held = [];
       const k = keys[Math.floor(Math.random() * keys.length)];
       hold(k); held.push(k);
+    }
+    const F = global.window.__SKCR.F;
+    if (F.f1 && F.f2) {
+      maxDmg1 = Math.max(maxDmg1, F.f1.maxHp - F.f1.hp);
+      maxDmg2 = Math.max(maxDmg2, F.f2.maxHp - F.f2.hp);
+      if (F.phase === 'ko' || F.phase === 'victory') sawKo = true;
     }
   });
   // mash continue through KO/round/victory screens
@@ -105,10 +114,8 @@ try {
   if (!dbg) throw new Error('debug hook missing');
   const { G, F } = dbg;
   if (!F.f1 || !F.f2) throw new Error('fighters never created');
-  const dmg1 = F.f1.maxHp - F.f1.hp, dmg2 = F.f2.maxHp - F.f2.hp;
-  const fought = dmg1 > 0 || dmg2 > 0 || F.wins[0] + F.wins[1] > 0;
-  if (!fought) throw new Error('no damage was ever dealt in 40s of combat');
-  console.log(`combat verified: p1 dealt/took ${dmg2.toFixed(0)}/${dmg1.toFixed(0)} dmg, rounds won ${F.wins[0]}-${F.wins[1]}, phase=${F.phase}, scene=${G.scene}`);
+  if (maxDmg1 <= 0 && maxDmg2 <= 0) throw new Error('no damage was ever dealt in 40s of combat');
+  console.log(`combat verified: p1 dealt/took ${maxDmg2.toFixed(0)}/${maxDmg1.toFixed(0)} dmg, ko/victory seen=${sawKo}, phase=${F.phase}, scene=${G.scene}`);
   console.log('SMOKE TEST PASSED — no exceptions across boot, menus, select, and combat.');
   // story mode quick pass
   press('Escape'); frames(5);
